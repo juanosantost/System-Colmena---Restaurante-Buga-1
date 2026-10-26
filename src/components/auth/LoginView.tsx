@@ -1,22 +1,18 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
-import { ColmenaUser } from '../../types';
 import {
   Sparkles,
   Shield,
-  UserCheck,
   Building2,
-  Lock,
-  ArrowRight,
   LogIn,
-  CheckCircle2,
-  Users,
+  User,
 } from 'lucide-react';
 
 export const LoginView: React.FC = () => {
   const {
     loginGoogle,
+    loginWithIdentifier,
     bootstrapFirstAdmin,
     branches,
   } = useAuth();
@@ -24,11 +20,31 @@ export const LoginView: React.FC = () => {
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [showBootstrapModal, setShowBootstrapModal] = useState<boolean>(false);
+  const [identifierInput, setIdentifierInput] = useState<string>('');
   
-  // Datos para registrar primer administrador
-  const [adminName, setAdminName] = useState<string>('Juan Carlos Gómez');
-  const [adminDoc, setAdminDoc] = useState<string>('1020304050');
-  const [adminEmail, setAdminEmail] = useState<string>('juan.santos.ieci@gmail.com');
+  // Datos para registrar primer administrador (vacíos por defecto)
+  const [adminName, setAdminName] = useState<string>('');
+  const [adminDoc, setAdminDoc] = useState<string>('');
+  const [adminEmail, setAdminEmail] = useState<string>('');
+
+  const handleCredentialLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!identifierInput.trim()) {
+      showToast('Ingresa tu correo o número de cédula', 'warning');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await loginWithIdentifier(identifierInput.trim());
+      showToast('¡Sesión iniciada con éxito en Sistema Colmena!', 'success');
+    } catch (err: any) {
+      console.error(err);
+      showToast(err.message || 'Error al iniciar sesión', 'error');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleGoogleLogin = async () => {
     setIsLoading(true);
@@ -77,7 +93,7 @@ export const LoginView: React.FC = () => {
         <div className="absolute -top-24 -right-24 w-56 h-56 bg-gradient-to-br from-[#B77900]/20 to-transparent rounded-full blur-2xl pointer-events-none" />
 
         {/* Encabezado Logo Colmena */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[#B77900] via-[#D6A21A] to-[#181818] text-[#FFFDF5] shadow-xl shadow-[#B77900]/30 border border-[#D6A21A]/50 mb-4">
             <span className="font-black text-3xl">⬡</span>
           </div>
@@ -93,30 +109,65 @@ export const LoginView: React.FC = () => {
           </div>
         </div>
 
-        {/* Botón de Acceso Principal con Google */}
-        <div className="space-y-4 mb-8">
+        {/* Formulario de Inicio de Sesión por Cédula o Correo */}
+        <form onSubmit={handleCredentialLogin} className="space-y-4 mb-6">
+          <div>
+            <label className="block text-xs font-bold text-[#a8a29e] mb-1">
+              Correo Electrónico o Número de Cédula
+            </label>
+            <div className="relative">
+              <User className="w-4 h-4 absolute left-3.5 top-3.5 text-[#D6A21A]" />
+              <input
+                type="text"
+                required
+                value={identifierInput}
+                onChange={(e) => setIdentifierInput(e.target.value)}
+                placeholder="Ingresa tu número de documento o correo registrado"
+                className="w-full bg-[#242424] border border-[#383838] rounded-xl pl-10 pr-4 py-3 text-xs text-[#FFFDF5] focus:outline-none focus:border-[#D6A21A]"
+              />
+            </div>
+            <p className="text-[10px] text-[#88837d] mt-1">
+              Solo personal registrado en el sistema puede acceder.
+            </p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading}
+            className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#B77900] via-[#D6A21A] to-[#B77900] hover:brightness-110 text-[#181818] font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-[#B77900]/25 transition-all cursor-pointer"
+          >
+            <LogIn className="w-4 h-4" />
+            <span>{isLoading ? 'Verificando...' : 'Iniciar Sesión'}</span>
+          </button>
+        </form>
+
+        <div className="relative my-6 text-center">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-[#2e2e2e]"></div>
+          </div>
+          <span className="relative px-3 bg-[#181818] text-[10px] uppercase font-bold text-[#a8a29e]">
+            O
+          </span>
+        </div>
+
+        {/* Botón Google */}
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          disabled={isLoading}
+          className="w-full py-3 px-4 rounded-xl bg-[#242424] border border-[#383838] hover:border-[#D6A21A] text-[#FFFDF5] text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
+        >
+          <span>Iniciar Sesión con Google</span>
+        </button>
+
+        <div className="mt-6 text-center">
           <button
             type="button"
-            onClick={handleGoogleLogin}
-            disabled={isLoading}
-            className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#B77900] via-[#D6A21A] to-[#B77900] hover:brightness-110 text-[#181818] font-black text-sm flex items-center justify-center gap-3 shadow-lg shadow-[#B77900]/25 transition-all cursor-pointer"
+            onClick={() => setShowBootstrapModal(true)}
+            className="text-[11px] text-[#D6A21A] hover:underline font-bold"
           >
-            <LogIn className="w-5 h-5 text-[#181818]" />
-            <span>{isLoading ? 'Autenticando...' : 'Iniciar Sesión con Google'}</span>
+            Configurar Primer Administrador (Si la base está vacía)
           </button>
-          
-          <div className="flex items-center justify-between px-1">
-            <span className="text-[11px] text-[#a8a29e]">
-              Autenticación segura con Firebase Authentication
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowBootstrapModal(true)}
-              className="text-[11px] text-[#D6A21A] hover:underline font-bold"
-            >
-              Asignar Primer Admin
-            </button>
-          </div>
         </div>
 
       </div>
@@ -147,6 +198,7 @@ export const LoginView: React.FC = () => {
                   required
                   value={adminName}
                   onChange={(e) => setAdminName(e.target.value)}
+                  placeholder="Ej: Juan Pérez"
                   className="w-full bg-[#242424] border border-[#383838] rounded-lg px-3 py-2 text-xs text-[#FFFDF5] focus:outline-none focus:border-[#D6A21A]"
                 />
               </div>
@@ -158,6 +210,7 @@ export const LoginView: React.FC = () => {
                   required
                   value={adminDoc}
                   onChange={(e) => setAdminDoc(e.target.value)}
+                  placeholder="Ej: 1020304050"
                   className="w-full bg-[#242424] border border-[#383838] rounded-lg px-3 py-2 text-xs text-[#FFFDF5] focus:outline-none focus:border-[#D6A21A]"
                 />
               </div>
@@ -169,24 +222,25 @@ export const LoginView: React.FC = () => {
                   required
                   value={adminEmail}
                   onChange={(e) => setAdminEmail(e.target.value)}
+                  placeholder="Ej: admin@colmena.com"
                   className="w-full bg-[#242424] border border-[#383838] rounded-lg px-3 py-2 text-xs text-[#FFFDF5] focus:outline-none focus:border-[#D6A21A]"
                 />
               </div>
 
-              <div className="pt-3 flex justify-end gap-2">
+              <div className="mt-5 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setShowBootstrapModal(false)}
-                  className="px-4 py-2 rounded-xl border border-[#383838] text-xs font-semibold text-[#a8a29e]"
+                  className="px-4 py-2 rounded-xl bg-[#242424] text-xs font-bold text-[#a8a29e] hover:text-[#FFFDF5]"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#B77900] to-[#D6A21A] text-[#181818] font-black text-xs hover:brightness-110 shadow"
+                  className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#B77900] to-[#D6A21A] text-[#181818] font-black text-xs hover:brightness-110"
                 >
-                  Registrar Administrador
+                  Guardar Administrador
                 </button>
               </div>
             </form>
@@ -194,10 +248,6 @@ export const LoginView: React.FC = () => {
         </div>
       )}
 
-      {/* Pie de página */}
-      <footer className="mt-8 text-center text-xs text-[#78716c]">
-        Sistema Colmena Restaurante · Colombia · Pesos Colombianos (COP) · America/Bogota
-      </footer>
     </div>
   );
 };

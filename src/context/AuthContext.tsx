@@ -33,6 +33,7 @@ interface AuthContextType {
   setCurrentBranchId: (branchId: string) => void;
   allUsers: ColmenaUser[];
   loginGoogle: () => Promise<void>;
+  loginWithIdentifier: (identifier: string, password?: string) => Promise<void>;
   loginAsStaffProfile: (user: ColmenaUser) => void;
   logout: () => Promise<void>;
   bootstrapFirstAdmin: (params: {
@@ -418,6 +419,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Iniciar sesión con Correo o Número de Cédula y contraseña/PIN opcional
+  const loginWithIdentifier = async (identifier: string, password?: string): Promise<void> => {
+    const term = identifier.toLowerCase().trim();
+    if (!term) throw new Error('Ingresa un correo electrónico o número de cédula.');
+
+    // Buscar en usuarios cargados (allUsers)
+    let matched = allUsers.find(
+      (u) =>
+        u.email.toLowerCase() === term ||
+        u.documentNumber === term ||
+        u.fullName.toLowerCase().includes(term)
+    );
+
+    if (!matched) {
+      // Buscar en Firestore /users por email o documento
+      try {
+        const qEmail = query(collection(db, 'users'), where('email', '==', term));
+        const snapEmail = await getDocs(qEmail);
+        if (!snapEmail.empty) {
+          const doc0 = snapEmail.docs[0];
+          matched = { ...doc0.data(), id: doc0.id } as ColmenaUser;
+        } else {
+          const qDoc = query(collection(db, 'users'), where('documentNumber', '==', term));
+          const snapDoc = await getDocs(qDoc);
+          if (!snapDoc.empty) {
+            const doc0 = snapDoc.docs[0];
+            matched = { ...doc0.data(), id: doc0.id } as ColmenaUser;
+          }
+        }
+      } catch (err) {
+        console.warn('Error querying user by identifier:', err);
+      }
+    }
+
+    if (!matched) {
+      throw new Error('Usuario no registrado en el sistema. Debe estar registrado en el módulo de usuarios por un administrador.');
+    }
+
+    if (!matched.isActive) {
+      throw new Error('Este usuario se encuentra inactivo en el sistema.');
+    }
+
+    setCurrentUser(matched);
+    if (matched.authorizedBranchIds && matched.authorizedBranchIds.length > 0 && !matched.authorizedBranchIds.includes(currentBranchId)) {
+      setCurrentBranchId(matched.authorizedBranchIds[0]);
+    }
+  };
+
   // Inicio de sesión directo como perfil del equipo (para terminal POS o selección de usuario)
   const loginAsStaffProfile = (user: ColmenaUser) => {
     setCurrentUser(user);
@@ -605,6 +654,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setCurrentBranchId: handleSetCurrentBranchId,
         allUsers,
         loginGoogle,
+        loginWithIdentifier,
         loginAsStaffProfile,
         logout,
         bootstrapFirstAdmin,

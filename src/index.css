@@ -15,6 +15,30 @@
     color: #FFFDF5;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
   }
+
+  .light .bg-\[\#181818\],
+  .light .bg-\[\#121214\],
+  .light .bg-\[\#1f1e24\],
+  .light .bg-\[\#1f1f24\],
+  .light .bg-\[\#242424\],
+  .light .bg-\[\#292212\] {
+    background-color: #ffffff !important;
+    color: #111111 !important;
+    border-color: #e2d9c5 !important;
+  }
+
+  .light .text-\[\#FFFDF5\],
+  .light .text-white,
+  .light .text-\[\#d6d3d1\],
+  .light .text-\[\#a8a29e\] {
+    color: #111111 !important;
+  }
+
+  .light input, .light select, .light textarea {
+    background-color: #fcfbfa !important;
+    color: #111111 !important;
+    border-color: #d4c5a9 !important;
+  }
 }
 
 /* Custom scrollbars */

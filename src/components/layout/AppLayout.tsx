@@ -30,6 +30,8 @@ import {
   MapPin,
   BookmarkCheck,
   CreditCard,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 export type AppView =
@@ -79,6 +81,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
   const [colombiaTime, setColombiaTime] = useState<string>('');
   const [showProfileMenu, setShowProfileMenu] = useState<boolean>(false);
 
@@ -240,10 +243,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-[#0e0e10] text-[#FFFDF5] flex flex-col antialiased selection:bg-[#B77900] selection:text-[#181818]">
+    <div className={`min-h-screen ${isDarkMode ? 'dark bg-[#0e0e10] text-[#FFFDF5]' : 'light bg-[#FFFDF5] text-[#181818]'} flex flex-col antialiased selection:bg-[#B77900] selection:text-[#FFFDF5] transition-colors duration-300`}>
       
       {/* 1. Encabezado Superior Fijo */}
-      <header className="bg-[#181818] border-b border-[#333333] text-[#FFFDF5] sticky top-0 z-40 shadow-lg">
+      <header className={`${isDarkMode ? 'bg-[#181818] border-[#333333]' : 'bg-[#FFFDF5] border-[#EADBBE]'} border-b sticky top-0 z-40 shadow-lg transition-colors duration-300`}>
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16 sm:h-20 gap-3">
             
@@ -295,8 +298,18 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
               </div>
             </div>
 
-            {/* Lado Derecho: Botón Cerrar Sesión */}
+            {/* Lado Derecho: Botón Tema Oscuro/Claro y Cerrar Sesión */}
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsDarkMode((prev) => !prev)}
+                className="p-2 rounded-xl bg-[#242424] hover:bg-[#333333] border border-[#383838] text-[#D6A21A] text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
+                title={isDarkMode ? 'Cambiar a Versión Clara' : 'Cambiar a Versión Oscura'}
+              >
+                {isDarkMode ? <Sun className="w-4 h-4 text-[#D6A21A]" /> : <Moon className="w-4 h-4 text-[#B77900]" />}
+                <span className="hidden md:inline">{isDarkMode ? 'Claro' : 'Oscuro'}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={handleLogout}
@@ -329,7 +342,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         
         {/* Barra Lateral Plegable para Desktop */}
         <aside
-          className={`hidden lg:flex flex-col bg-[#181818] border-r border-[#333333] transition-all duration-300 z-30 sticky top-20 h-[calc(100vh-5rem)] ${
+          className={`hidden lg:flex flex-col ${isDarkMode ? 'bg-[#181818] border-[#333333]' : 'bg-[#F7F3E8] border-[#EADBBE]'} border-r transition-all duration-300 z-30 sticky top-20 h-[calc(100vh-5rem)] ${
             isSidebarCollapsed ? 'w-20' : 'w-64'
           }`}
         >
@@ -555,7 +568,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
       </div>
 
       {/* 3. Footer Oficial Colmena */}
-      <footer className="bg-[#181818] border-t border-[#333333] py-4 text-xs text-[#a8a29e]">
+      <footer className={`${isDarkMode ? 'bg-[#181818] border-[#333333] text-[#a8a29e]' : 'bg-[#F7F3E8] border-[#EADBBE] text-[#78716c]'} border-t py-4 text-xs transition-colors duration-300`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="text-[#D6A21A] font-bold">⬡ Sistema Colmena Restaurante</span>
