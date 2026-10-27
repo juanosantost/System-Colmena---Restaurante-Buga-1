@@ -20,12 +20,18 @@ import {
   Lock,
   Unlock,
   Layers,
+  Coins,
+  Edit2,
+  Trash2,
 } from 'lucide-react';
 
 export const CashView: React.FC = () => {
   const {
     activeShift,
     openCashShift,
+    addCashBase,
+    updateCashBase,
+    deleteCashBase,
     closeCashShift,
     addCashMovement,
     cashMovements,
@@ -40,8 +46,18 @@ export const CashView: React.FC = () => {
   const [receiptPayment, setReceiptPayment] = useState<Payment | null>(null);
 
   // Estados para abrir turno
-  const [openShiftBase, setOpenShiftBase] = useState<number>(350000); // 350.000 COP base estándar
+  const [openShiftBase, setOpenShiftBase] = useState<number>(350000);
   const [openShiftNotes, setOpenShiftNotes] = useState<string>('Apertura de turno de caja');
+
+  // Estados para registrar base adicional (múltiples bases)
+  const [showBaseModal, setShowBaseModal] = useState<boolean>(false);
+  const [baseAmount, setBaseAmount] = useState<number>(100000);
+  const [baseReason, setBaseReason] = useState<string>('Adición de base de caja');
+
+  // Estados para editar base
+  const [editingBaseId, setEditingBaseId] = useState<string | null>(null);
+  const [editBaseAmount, setEditBaseAmount] = useState<number>(0);
+  const [editBaseReason, setEditBaseReason] = useState<string>('');
 
   // Estados para arqueo y cierre
   const [showCloseModal, setShowCloseModal] = useState<boolean>(false);
@@ -70,6 +86,26 @@ export const CashView: React.FC = () => {
     await openCashShift(openShiftBase, openShiftNotes);
   };
 
+  const handleAddBaseSubmit = async () => {
+    if (actionLoading || !activeShift || baseAmount <= 0 || !baseReason.trim()) return;
+    await addCashBase(baseAmount, baseReason.trim());
+    setShowBaseModal(false);
+    setBaseReason('Adición de base de caja');
+  };
+
+  const handleUpdateBaseSubmit = async () => {
+    if (actionLoading || !activeShift || !editingBaseId || editBaseAmount <= 0 || !editBaseReason.trim()) return;
+    await updateCashBase(editingBaseId, editBaseAmount, editBaseReason.trim());
+    setEditingBaseId(null);
+  };
+
+  const handleDeleteBase = async (baseId: string) => {
+    if (actionLoading || !activeShift) return;
+    if (window.confirm('¿Estás seguro de eliminar este registro de base de caja?')) {
+      await deleteCashBase(baseId);
+    }
+  };
+
   const handleCloseShift = async () => {
     if (actionLoading || !activeShift) return;
     await closeCashShift(actualCashCount, closeShiftNotes);
@@ -86,7 +122,7 @@ export const CashView: React.FC = () => {
   return (
     <div className="space-y-6">
       
-      {/* 1. Panel Principal del Turno de Caja */}
+      {/* 1. Panel Principal del Turno de Caja & Bases */}
       <div className="bg-[#14131a] p-5 rounded-2xl border border-[#2d281e] shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-[#2d281e] gap-4">
           <div className="flex items-center gap-3">
@@ -96,7 +132,7 @@ export const CashView: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base font-bold text-[#fef3c7]">
-                  Control de Caja y Cuadre de Turno (Arqueo)
+                  Control de Caja, Bases & Cierre de Turno (Arqueo)
                 </h2>
                 <span
                   className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
@@ -109,15 +145,24 @@ export const CashView: React.FC = () => {
                 </span>
               </div>
               <p className="text-xs text-[#a8a29e]">
-                {currentBranch?.name} · {activeShift ? `Cajero: ${activeShift.cashierName}` : 'Inicia un turno para registrar cobros en efectivo'}
+                {currentBranch?.name} · {activeShift ? `Cajero: ${activeShift.cashierName} (Desde: ${formatColombiaDateTime(activeShift.openedAt)})` : 'Inicia un turno para registrar bases y cobros'}
               </p>
             </div>
           </div>
 
-          {/* Botones de control del turno */}
-          <div className="flex items-center gap-2">
+          {/* Botones de control del turno y bases */}
+          <div className="flex flex-wrap items-center gap-2">
             {activeShift ? (
               <>
+                <button
+                  type="button"
+                  onClick={() => setShowBaseModal(true)}
+                  className="px-3.5 py-2 rounded-xl bg-[#2b2416] text-[#fef3c7] border border-[#d4af37]/50 hover:bg-[#3d321d] text-xs font-bold flex items-center gap-1.5 cursor-pointer transition-all"
+                >
+                  <Coins className="w-4 h-4 text-[#d4af37]" />
+                  <span>Registrar Base Adicional</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setShowMovementModal(true)}
@@ -162,17 +207,19 @@ export const CashView: React.FC = () => {
           </div>
         </div>
 
-        {/* Métricas del Turno Abierto */}
+        {/* Métricas del Turno Abierto (Incluyendo todos los medios de pago y múltiples bases) */}
         {activeShift && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-4">
             
-            {/* Base Inicial */}
+            {/* Base Inicial y Adicionales */}
             <div className="bg-[#18171f] p-3 rounded-xl border border-[#2d281e]">
-              <span className="text-[10px] text-[#a8a29e] uppercase font-bold block">Base Inicial</span>
+              <span className="text-[10px] text-[#a8a29e] uppercase font-bold block">Base Total</span>
               <span className="text-sm font-black text-[#fef3c7] mt-1 block">
                 {formatCOP(activeShift.initialCash)}
               </span>
-              <span className="text-[10px] text-[#78716c]">Efectivo de inicio</span>
+              <span className="text-[10px] text-[#78716c]">
+                {activeShift.baseEntries?.length ? `${activeShift.baseEntries.length} entradas de base` : 'Base inicial'}
+              </span>
             </div>
 
             {/* Ventas Efectivo */}
@@ -193,13 +240,13 @@ export const CashView: React.FC = () => {
               <span className="text-[10px] text-[#78716c]">Vouchers bancarios</span>
             </div>
 
-            {/* Ventas Nequi / Daviplata */}
+            {/* Ventas Nequi / Daviplata / Transferencia */}
             <div className="bg-[#18171f] p-3 rounded-xl border border-[#2d281e]">
               <span className="text-[10px] text-[#a8a29e] uppercase font-bold block">Nequi / Daviplata</span>
               <span className="text-sm font-black text-purple-300 mt-1 block">
                 {formatCOP(activeShift.salesTransfer)}
               </span>
-              <span className="text-[10px] text-[#78716c]">Transferencias</span>
+              <span className="text-[10px] text-[#78716c]">Transferencias activas</span>
             </div>
 
             {/* Movimientos menores (Ingresos / Egresos) */}
@@ -224,7 +271,66 @@ export const CashView: React.FC = () => {
         )}
       </div>
 
-      {/* 2. Sección: Pedidos Abiertos Pendientes de Cobro */}
+      {/* 2. Sección: Listado de Bases Registradas en el Turno */}
+      {activeShift && activeShift.baseEntries && activeShift.baseEntries.length > 0 && (
+        <div className="bg-[#14131a] p-5 rounded-2xl border border-[#2d281e] shadow-xl">
+          <div className="flex items-center justify-between pb-3 border-b border-[#2d281e] mb-3">
+            <h3 className="font-bold text-sm text-[#fef3c7] flex items-center gap-2">
+              <Coins className="w-4 h-4 text-[#d4af37]" />
+              <span>Bases Registradas en el Turno ({activeShift.baseEntries.length})</span>
+            </h3>
+            <span className="text-xs text-[#a8a29e]">
+              Suma Total de Bases: {formatCOP(activeShift.initialCash)}
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {activeShift.baseEntries.map((base) => (
+              <div
+                key={base.id}
+                className="bg-[#18171f] p-3 rounded-xl border border-[#2d281e] flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-black text-sm text-[#fef3c7]">{formatCOP(base.amount)}</span>
+                    <span className="text-[10px] uppercase font-bold px-2 py-0.5 rounded bg-[#2b2416] text-[#d4af37] border border-[#d4af37]/30">
+                      {base.reason}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-[#a8a29e] mt-1 block">
+                    Registrado el {formatColombiaDateTime(base.createdAt)} · Por {base.userName}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingBaseId(base.id);
+                      setEditBaseAmount(base.amount);
+                      setEditBaseReason(base.reason);
+                    }}
+                    className="px-2.5 py-1.5 rounded-lg bg-[#252016] text-[#d4af37] border border-[#d4af37]/40 hover:bg-[#352c1b] font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    <span>Editar</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteBase(base.id)}
+                    className="px-2.5 py-1.5 rounded-lg bg-red-950 text-red-300 border border-red-700/50 hover:bg-red-900 font-bold flex items-center gap-1 cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Borrar</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* 3. Sección: Pedidos Abiertos Pendientes de Cobro */}
       <div className="bg-[#14131a] p-5 rounded-2xl border border-[#2d281e] shadow-xl">
         <div className="flex items-center justify-between pb-3 border-b border-[#2d281e] mb-4">
           <div className="flex items-center gap-2">
@@ -288,7 +394,7 @@ export const CashView: React.FC = () => {
         )}
       </div>
 
-      {/* 3. Sección: Historial de Movimientos de Caja Menor */}
+      {/* 4. Sección: Historial de Movimientos de Caja Menor */}
       <div className="bg-[#14131a] p-5 rounded-2xl border border-[#2d281e] shadow-xl">
         <h3 className="font-bold text-sm text-[#fef3c7] mb-3 flex items-center gap-2">
           <Clock className="w-4 h-4 text-[#d4af37]" />
@@ -334,6 +440,115 @@ export const CashView: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* MODAL: Registrar Base Adicional */}
+      {showBaseModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#121117] border border-[#3f3521] rounded-2xl w-full max-w-md p-5 text-[#faf5ee] shadow-2xl">
+            <h3 className="font-bold text-base text-[#fef3c7] mb-1">
+              Registrar Base Adicional de Caja
+            </h3>
+            <p className="text-xs text-[#a8a29e] mb-4">
+              Permite inyectar o sumar una nueva base de efectivo al turno actual.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-[#a8a29e] mb-1">Monto de la Base (COP)</label>
+                <input
+                  type="number"
+                  value={baseAmount}
+                  onChange={(e) => setBaseAmount(parseInt(e.target.value) || 0)}
+                  className="w-full bg-[#18171f] border border-[#383124] rounded-lg px-3 py-2 text-sm font-bold text-[#fef3c7]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#a8a29e] mb-1">Motivo / Concepto</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Adición de cambio, fondo adicional"
+                  value={baseReason}
+                  onChange={(e) => setBaseReason(e.target.value)}
+                  className="w-full bg-[#18171f] border border-[#383124] rounded-lg px-3 py-2 text-xs text-[#fef3c7] focus:outline-none focus:border-[#d4af37]"
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setShowBaseModal(false)}
+                className="px-4 py-2 rounded-xl border border-[#383124] text-xs font-semibold text-[#a8a29e]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleAddBaseSubmit}
+                disabled={baseAmount <= 0 || !baseReason.trim()}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#d4af37] to-[#b89728] text-[#0e0e12] font-black text-xs hover:brightness-110 disabled:opacity-50"
+              >
+                Guardar Base
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Editar Base */}
+      {editingBaseId && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#121117] border border-[#3f3521] rounded-2xl w-full max-w-md p-5 text-[#faf5ee] shadow-2xl">
+            <h3 className="font-bold text-base text-[#fef3c7] mb-1">
+              Editar Registro de Base
+            </h3>
+            <p className="text-xs text-[#a8a29e] mb-4">
+              Modifica el valor o el concepto de esta entrada de base.
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-semibold text-[#a8a29e] mb-1">Monto de la Base (COP)</label>
+                <input
+                  type="number"
+                  value={editBaseAmount}
+                  onChange={(e) => setEditBaseAmount(parseInt(e.target.value) || 0)}
+                  className="w-full bg-[#18171f] border border-[#383124] rounded-lg px-3 py-2 text-sm font-bold text-[#fef3c7]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#a8a29e] mb-1">Motivo / Concepto</label>
+                <input
+                  type="text"
+                  value={editBaseReason}
+                  onChange={(e) => setEditBaseReason(e.target.value)}
+                  className="w-full bg-[#18171f] border border-[#383124] rounded-lg px-3 py-2 text-xs text-[#fef3c7] focus:outline-none focus:border-[#d4af37]"
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingBaseId(null)}
+                className="px-4 py-2 rounded-xl border border-[#383124] text-xs font-semibold text-[#a8a29e]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleUpdateBaseSubmit}
+                disabled={editBaseAmount <= 0 || !editBaseReason.trim()}
+                className="px-5 py-2 rounded-xl bg-gradient-to-r from-[#d4af37] to-[#b89728] text-[#0e0e12] font-black text-xs hover:brightness-110 disabled:opacity-50"
+              >
+                Actualizar Base
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: Movimiento de Caja Menor (Ingreso / Egreso) */}
       {showMovementModal && (
@@ -426,18 +641,26 @@ export const CashView: React.FC = () => {
               Arqueo de Caja y Cierre de Turno
             </h3>
             <p className="text-xs text-[#a8a29e] mb-4">
-              Ingresa el dinero físico contado en el cajón para calcular diferencias.
+              Cálculo desde apertura ({formatColombiaDateTime(activeShift.openedAt)}) hasta el momento actual. Incluye todos los medios de pago.
             </p>
 
             <div className="space-y-4">
               <div className="bg-[#18171f] p-3 rounded-xl border border-[#2d281e] space-y-1.5 text-xs">
                 <div className="flex justify-between text-[#a8a29e]">
-                  <span>Base Inicial:</span>
+                  <span>Base Total Registrada:</span>
                   <span>{formatCOP(activeShift.initialCash)}</span>
                 </div>
-                <div className="flex justify-between text-[#a8a29e]">
+                <div className="flex justify-between text-emerald-400">
                   <span>Ventas en Efectivo:</span>
                   <span>+{formatCOP(activeShift.salesCash)}</span>
+                </div>
+                <div className="flex justify-between text-cyan-300">
+                  <span>Tarjetas / Datáfono:</span>
+                  <span>+{formatCOP(activeShift.salesCard)}</span>
+                </div>
+                <div className="flex justify-between text-purple-300">
+                  <span>Nequi / Daviplata:</span>
+                  <span>+{formatCOP(activeShift.salesTransfer)}</span>
                 </div>
                 <div className="flex justify-between text-[#a8a29e]">
                   <span>Caja Menor Neta:</span>

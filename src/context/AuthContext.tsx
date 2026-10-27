@@ -95,7 +95,14 @@ export const INITIAL_BRANCHES: Branch[] = [
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
-  const [currentUser, setCurrentUser] = useState<ColmenaUser | null>(null);
+  const [currentUser, setCurrentUser] = useState<ColmenaUser | null>(() => {
+    try {
+      const saved = localStorage.getItem('colmena_logged_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [branches, setBranches] = useState<Branch[]>(INITIAL_BRANCHES);
   const [currentBranchId, setCurrentBranchId] = useState<string>('sede-buga');
   const [allUsers, setAllUsers] = useState<ColmenaUser[]>([]);
@@ -108,22 +115,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       async (fbUser) => {
         setFirebaseUser(fbUser);
         if (!fbUser) {
-          // Si no hay sesión de Google activa, verificar si hay un usuario administrador local
-          if (!currentUser) {
-            const adminUser: ColmenaUser = {
-              id: 'usr-admin-principal',
-              firebaseUid: 'admin-seed-uid',
-              fullName: 'Juan Carlos Gómez',
-              documentNumber: '1020304050',
-              email: 'juan.santos.ieci@gmail.com',
-              role: 'administrador',
-              authorizedBranchIds: ['sede-chapinero', 'sede-parque93'],
-              isActive: true,
-              createdAt: new Date().toISOString(),
-              lastLoginAt: new Date().toISOString(),
-              phone: '3001234567',
-            };
-            setCurrentUser(adminUser);
+          // Si no hay sesión de Firebase activa y no hay credenciales en localStorage, cerrar sesión
+          const saved = localStorage.getItem('colmena_logged_user');
+          if (!saved) {
+            setCurrentUser(null);
           }
         } else {
           try {
@@ -361,6 +356,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const saveUserSession = (user: ColmenaUser) => {
+    setCurrentUser(user);
+    try {
+      localStorage.setItem('colmena_logged_user', JSON.stringify(user));
+    } catch (e) {
+      console.warn('Could not save user session', e);
+    }
+  };
+
+  const clearUserSession = () => {
+    setCurrentUser(null);
+    try {
+      localStorage.removeItem('colmena_logged_user');
+    } catch (e) {
+      console.warn('Could not remove user session', e);
+    }
+  };
+
   // Iniciar sesión con Google
   const loginGoogle = async () => {
     const provider = new GoogleAuthProvider();
@@ -379,7 +392,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await signOut(auth);
         throw new Error('Este usuario se encuentra inactivo.');
       }
-      setCurrentUser(u);
+      saveUserSession(u);
       await updateDoc(userDocRef, {
         lastLoginAt: new Date().toISOString(),
       });
@@ -390,7 +403,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!qSnap.empty) {
         const doc0 = qSnap.docs[0];
         const u = { ...doc0.data(), id: doc0.id } as ColmenaUser;
-        setCurrentUser(u);
+        saveUserSession(u);
         await updateDoc(doc(db, 'users', doc0.id), {
           firebaseUid: user.uid,
           lastLoginAt: new Date().toISOString(),
@@ -414,12 +427,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           phone: '3001234567',
         };
         await setDoc(userDocRef, newUser);
-        setCurrentUser(newUser);
+        saveUserSession(newUser);
       }
     }
   };
 
-  // Iniciar sesión con Correo o Número de Cédula y contraseña/PIN opcional
+  // Iniciar sesión con Correo o Número de Cédula
   const loginWithIdentifier = async (identifier: string, password?: string): Promise<void> => {
     const term = identifier.toLowerCase().trim();
     if (!term) throw new Error('Ingresa un correo electrónico o número de cédula.');
@@ -461,7 +474,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Este usuario se encuentra inactivo en el sistema.');
     }
 
-    setCurrentUser(matched);
+    saveUserSession(matched);
     if (matched.authorizedBranchIds && matched.authorizedBranchIds.length > 0 && !matched.authorizedBranchIds.includes(currentBranchId)) {
       setCurrentBranchId(matched.authorizedBranchIds[0]);
     }
@@ -469,7 +482,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Inicio de sesión directo como perfil del equipo (para terminal POS o selección de usuario)
   const loginAsStaffProfile = (user: ColmenaUser) => {
-    setCurrentUser(user);
+    saveUserSession(user);
     if (user.authorizedBranchIds.length > 0 && !user.authorizedBranchIds.includes(currentBranchId)) {
       setCurrentBranchId(user.authorizedBranchIds[0]);
     }
@@ -483,7 +496,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Signout note:', e);
     }
     setFirebaseUser(null);
-    setCurrentUser(null);
+    clearUserSession();
   };
 
   // Procedimiento seguro para registrar el Primer Administrador

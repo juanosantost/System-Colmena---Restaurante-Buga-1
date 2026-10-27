@@ -12,6 +12,7 @@ import {
   orderBy,
   limit,
   deleteDoc,
+  writeBatch,
 } from 'firebase/firestore';
 import { db, initializeAuthAndConnection, handleFirestoreError, OperationType, sanitizeFirestoreData } from '../services/firebase';
 import { checkAndSeedInitialData, INITIAL_BRANCHES } from '../services/dbSeed';
@@ -41,6 +42,7 @@ import {
   KitchenStation,
   OrderType,
   PaymentMethod,
+  PaymentMethodItem,
   PaymentSplit,
   Product,
   Category,
@@ -69,6 +71,8 @@ import {
   Abono,
   AbonoParentType,
   AbonoStatus,
+  Expense,
+  OtherIncome,
 } from '../types';
 import {
   calculateOrderTotals,
@@ -217,6 +221,9 @@ interface RestaurantContextType {
   }) => Promise<Payment>;
 
   openCashShift: (initialCash: number, notes?: string) => Promise<void>;
+  addCashBase: (amount: number, reason: string) => Promise<void>;
+  updateCashBase: (baseId: string, newAmount: number, newReason: string) => Promise<void>;
+  deleteCashBase: (baseId: string) => Promise<void>;
   closeCashShift: (actualCash: number, notes?: string) => Promise<void>;
   addCashMovement: (type: 'ingreso' | 'egreso', amount: number, reason: string) => Promise<void>;
   updateInventoryStock: (
@@ -249,15 +256,24 @@ interface RestaurantContextType {
   cancelProductionLog: (productionId: string, reason?: string) => Promise<void>;
   updateTableStatus: (tableId: string, status: TableStatus) => Promise<void>;
 
-  // Módulo 11: Compras y Proveedores
+  // Módulo 11: Compras, Proveedores y Gastos
   suppliers: Supplier[];
   purchases: Purchase[];
+  expenses: Expense[];
   supplierAdvances: SupplierAdvance[];
   purchasePayments: PurchasePayment[];
   supplierAdvanceReintegros: SupplierAdvanceReintegro[];
   createSupplier: (data: Omit<Supplier, 'id' | 'createdAt'>) => Promise<string>;
   updateSupplier: (id: string, data: Partial<Supplier>) => Promise<void>;
   toggleSupplierStatus: (id: string, status: 'activo' | 'inactivo') => Promise<void>;
+  createExpense: (data: {
+    category: string;
+    concept: string;
+    thirdParty: string;
+    paymentMethod: string;
+    amount: number;
+    observations: string;
+  }) => Promise<Expense>;
   createPurchase: (data: {
     supplierId: string;
     supplierName: string;
@@ -367,8 +383,75 @@ interface RestaurantContextType {
   editAbono: (abonoId: string, updates: { notes?: string; paymentMethod?: PaymentMethod }) => Promise<void>;
   voidAbono: (abonoId: string, reason: string) => Promise<void>;
 
+  // Medios de Pago
+  paymentMethods: PaymentMethodItem[];
+  createPaymentMethod: (data: Omit<PaymentMethodItem, 'id' | 'createdAt'>) => Promise<string>;
+  updatePaymentMethod: (id: string, updates: Partial<PaymentMethodItem>) => Promise<void>;
+  deletePaymentMethod: (id: string) => Promise<void>;
+  togglePaymentMethodStatus: (id: string, status?: boolean) => Promise<void>;
+
+  // Otros Ingresos
+  otherIncomes: OtherIncome[];
+  createOtherIncome: (data: {
+    date?: string;
+    concept: string;
+    thirdParty?: string;
+    paymentMethod: PaymentMethod;
+    amount: number;
+    observations?: string;
+  }) => Promise<OtherIncome>;
+  updateOtherIncome: (id: string, updates: Partial<OtherIncome>) => Promise<void>;
+  voidOtherIncome: (id: string, reason: string) => Promise<void>;
+  voidPayment: (paymentId: string, reason: string) => Promise<void>;
+
   clearAllTransactionalRecords: () => Promise<void>;
 }
+
+export const DEFAULT_PAYMENT_METHODS: Omit<PaymentMethodItem, 'id' | 'createdAt'>[] = [
+  {
+    name: 'Efectivo',
+    category: 'efectivo',
+    description: 'Billetes y monedas en caja física (afecta arqueo de efectivo)',
+    isActive: true,
+    requiresReference: false,
+    isCashType: true,
+  },
+  {
+    name: 'Transferencia Bancaria',
+    category: 'transferencia',
+    bankName: 'Bancolombia',
+    description: 'Transferencia directa a cuenta bancaria empresarial',
+    isActive: true,
+    requiresReference: true,
+    isCashType: false,
+  },
+  {
+    name: 'Nequi',
+    category: 'billetera_digital',
+    bankName: 'Nequi',
+    description: 'Transferencia o escaneo de código QR Nequi',
+    isActive: true,
+    requiresReference: true,
+    isCashType: false,
+  },
+  {
+    name: 'Daviplata',
+    category: 'billetera_digital',
+    bankName: 'Davivienda / Daviplata',
+    description: 'Transferencia o escaneo de código QR Daviplata',
+    isActive: true,
+    requiresReference: true,
+    isCashType: false,
+  },
+  {
+    name: 'Tarjeta Débito / Crédito',
+    category: 'tarjeta',
+    description: 'Datáfono POS (Redeban, CredibanCo, Bold, etc.)',
+    isActive: true,
+    requiresReference: true,
+    isCashType: false,
+  },
+];
 
 const RestaurantContext = createContext<RestaurantContextType | null>(null);
 
@@ -379,6 +462,11 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [staffName, setStaffName] = useState<string>('Juan Administrador');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [actionLoading, setActionLoading] = useState<boolean>(false);
+
+  // Medios de Pago
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodItem[]>([]);
+  // Otros Ingresos
+  const [otherIncomes, setOtherIncomes] = useState<OtherIncome[]>([]);
 
   // Colecciones reactivas
   const [tables, setTables] = useState<Table[]>([]);
@@ -402,9 +490,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const [catalogCategories, setCatalogCategories] = useState<Category[]>([]);
   const [modifierGroups, setModifierGroups] = useState<ModifierGroup[]>([]);
 
-  // Módulo 11: Compras y Proveedores
+  // Módulo 11: Compras, Proveedores y Gastos
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [purchases, setPurchases] = useState<Purchase[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [supplierAdvances, setSupplierAdvances] = useState<SupplierAdvance[]>([]);
   const [purchasePayments, setPurchasePayments] = useState<PurchasePayment[]>([]);
   const [supplierAdvanceReintegros, setSupplierAdvanceReintegros] = useState<SupplierAdvanceReintegro[]>([]);
@@ -527,6 +616,34 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setCustomers(list.sort((a, b) => a.name.localeCompare(b.name)));
     }, (error) => handleFirestoreError(error, OperationType.GET, 'customers'));
 
+    // Configuración: Medios de Pago
+    const paymentMethodsQ = query(collection(db, 'payment_methods'));
+    const unsubPaymentMethods = onSnapshot(
+      paymentMethodsQ,
+      async (snap) => {
+        if (snap.empty) {
+          try {
+            const batch = writeBatch(db);
+            DEFAULT_PAYMENT_METHODS.forEach((pm) => {
+              const docRef = doc(collection(db, 'payment_methods'));
+              batch.set(docRef, {
+                ...pm,
+                createdAt: new Date().toISOString(),
+              });
+            });
+            await batch.commit();
+          } catch (e) {
+            console.error('Error sembrando medios de pago por defecto:', e);
+          }
+        } else {
+          const list: PaymentMethodItem[] = [];
+          snap.forEach((d) => list.push({ ...d.data(), id: d.id } as PaymentMethodItem));
+          setPaymentMethods(list.sort((a, b) => a.name.localeCompare(b.name)));
+        }
+      },
+      (error) => handleFirestoreError(error, OperationType.GET, 'payment_methods')
+    );
+
     return () => {
       unsubBranches();
       unsubCategories();
@@ -536,6 +653,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       unsubProducts();
       unsubSuppliers();
       unsubCustomers();
+      unsubPaymentMethods();
     };
   }, []);
 
@@ -706,6 +824,20 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       setAbonos(list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
     }, (error) => handleFirestoreError(error, OperationType.GET, 'abonos'));
 
+    const expensesQ = query(collection(db, 'expenses'), where('branchId', '==', currentBranchId));
+    const unsubExpenses = onSnapshot(expensesQ, (snap) => {
+      const list: Expense[] = [];
+      snap.forEach((d) => list.push({ ...d.data(), id: d.id } as Expense));
+      setExpenses(list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'expenses'));
+
+    const otherIncomesQ = query(collection(db, 'other_incomes'), where('branchId', '==', currentBranchId));
+    const unsubOtherIncomes = onSnapshot(otherIncomesQ, (snap) => {
+      const list: OtherIncome[] = [];
+      snap.forEach((d) => list.push({ ...d.data(), id: d.id } as OtherIncome));
+      setOtherIncomes(list.sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime()));
+    }, (error) => handleFirestoreError(error, OperationType.GET, 'other_incomes'));
+
     return () => {
       unsubTables();
       unsubAreas();
@@ -725,6 +857,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       unsubSeparados();
       unsubCartera();
       unsubAbonos();
+      unsubExpenses();
+      unsubOtherIncomes();
     };
   }, [currentBranchId]);
 
@@ -1320,6 +1454,13 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       const now = new Date().toISOString();
       const shiftId = `shift-${Date.now()}`;
+      const initialBaseEntry = {
+        id: `base-${Date.now()}`,
+        amount: initialCash,
+        reason: notes || 'Base inicial de apertura',
+        createdAt: now,
+        userName: staffName,
+      };
       const newShift: CashShift = {
         id: shiftId,
         branchId: currentBranchId,
@@ -1328,6 +1469,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         openedAt: now,
         closedAt: null,
         initialCash,
+        baseEntries: [initialBaseEntry],
         salesCash: 0,
         salesCard: 0,
         salesTransfer: 0,
@@ -1343,6 +1485,91 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     } catch (error) {
       console.error('Error opening shift:', error);
       handleFirestoreError(error, OperationType.CREATE, 'cashShifts');
+    }
+  };
+
+  // OPERACIÓN 5.1: Registrar Base Adicional de Caja
+  const addCashBase = async (amount: number, reason: string) => {
+    if (!activeShift) throw new Error('No hay un turno de caja abierto en esta sucursal');
+    try {
+      const now = new Date().toISOString();
+      const baseEntry = {
+        id: `base-${Date.now()}`,
+        amount,
+        reason,
+        createdAt: now,
+        userName: staffName,
+      };
+      const newInitial = (activeShift.initialCash || 0) + amount;
+      const existingEntries = activeShift.baseEntries || [];
+      const balance = calculateCashBalance(
+        newInitial,
+        activeShift.salesCash,
+        activeShift.inflowCash,
+        activeShift.outflowCash,
+        activeShift.actualCash
+      );
+
+      await updateDoc(doc(db, 'cashShifts', activeShift.id), {
+        initialCash: newInitial,
+        baseEntries: [...existingEntries, baseEntry],
+        expectedCash: balance.expectedCash,
+      });
+    } catch (error) {
+      console.error('Error adding cash base:', error);
+      handleFirestoreError(error, OperationType.UPDATE, 'cashShifts');
+    }
+  };
+
+  // OPERACIÓN 5.2: Editar Base de Caja Registrada
+  const updateCashBase = async (baseId: string, newAmount: number, newReason: string) => {
+    if (!activeShift) throw new Error('No hay un turno de caja abierto en esta sucursal');
+    try {
+      const entries = activeShift.baseEntries || [];
+      const updatedEntries = entries.map((b) => (b.id === baseId ? { ...b, amount: newAmount, reason: newReason } : b));
+      const totalInitial = updatedEntries.reduce((acc, curr) => acc + curr.amount, 0);
+      const balance = calculateCashBalance(
+        totalInitial,
+        activeShift.salesCash,
+        activeShift.inflowCash,
+        activeShift.outflowCash,
+        activeShift.actualCash
+      );
+
+      await updateDoc(doc(db, 'cashShifts', activeShift.id), {
+        initialCash: totalInitial,
+        baseEntries: updatedEntries,
+        expectedCash: balance.expectedCash,
+      });
+    } catch (error) {
+      console.error('Error updating cash base:', error);
+      handleFirestoreError(error, OperationType.UPDATE, 'cashShifts');
+    }
+  };
+
+  // OPERACIÓN 5.3: Borrar Base de Caja Registrada
+  const deleteCashBase = async (baseId: string) => {
+    if (!activeShift) throw new Error('No hay un turno de caja abierto en esta sucursal');
+    try {
+      const entries = activeShift.baseEntries || [];
+      const updatedEntries = entries.filter((b) => b.id !== baseId);
+      const totalInitial = updatedEntries.reduce((acc, curr) => acc + curr.amount, 0);
+      const balance = calculateCashBalance(
+        totalInitial,
+        activeShift.salesCash,
+        activeShift.inflowCash,
+        activeShift.outflowCash,
+        activeShift.actualCash
+      );
+
+      await updateDoc(doc(db, 'cashShifts', activeShift.id), {
+        initialCash: totalInitial,
+        baseEntries: updatedEntries,
+        expectedCash: balance.expectedCash,
+      });
+    } catch (error) {
+      console.error('Error deleting cash base:', error);
+      handleFirestoreError(error, OperationType.UPDATE, 'cashShifts');
     }
   };
 
@@ -2723,6 +2950,65 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  const createExpense = async (data: {
+    category: string;
+    concept: string;
+    thirdParty: string;
+    paymentMethod: string;
+    amount: number;
+    observations: string;
+  }): Promise<Expense> => {
+    setActionLoading(true);
+    try {
+      const now = new Date().toISOString();
+      const ref = doc(collection(db, 'expenses'));
+      const id = ref.id;
+      const consecutivo = `EXP-${Math.floor(1000 + Math.random() * 9000)}`;
+
+      const newExpense: Expense = {
+        id,
+        branchId: currentBranchId,
+        category: data.category,
+        concept: data.concept,
+        thirdParty: data.thirdParty,
+        paymentMethod: data.paymentMethod,
+        amount: data.amount,
+        observations: data.observations,
+        createdAt: now,
+        userId: staffName,
+        userName: staffName,
+        status: 'activo',
+        consecutivo,
+      };
+
+      await setDoc(ref, sanitizeFirestoreData(newExpense));
+
+      if (activeShift && data.paymentMethod === 'efectivo') {
+        await addCashMovement(
+          'egreso',
+          data.amount,
+          `Gasto #${consecutivo} (${data.concept}) - ${data.thirdParty}`
+        );
+      }
+
+      await logAuditAction({
+        entityType: 'branch',
+        entityId: id,
+        entityName: `Gasto #${consecutivo}`,
+        action: 'create',
+        details: `Gasto registrado: ${data.concept} por $${data.amount.toLocaleString('es-CO')} (${data.category})`,
+      });
+
+      return newExpense;
+    } catch (err) {
+      console.error('Error creating expense:', err);
+      handleFirestoreError(err, OperationType.CREATE, 'expenses');
+      throw err;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const createSupplierAdvance = async (params: {
     supplierId: string;
     supplierName: string;
@@ -4056,6 +4342,286 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
+  // CRUD de Medios de Pago
+  const createPaymentMethod = async (data: Omit<PaymentMethodItem, 'id' | 'createdAt'>): Promise<string> => {
+    setActionLoading(true);
+    try {
+      const now = new Date().toISOString();
+      const sanitized = sanitizeFirestoreData({
+        ...data,
+        createdAt: now,
+        updatedAt: now,
+      });
+      const docRef = await addDoc(collection(db, 'payment_methods'), sanitized);
+      await logAuditAction({
+        entityType: 'branch',
+        entityId: docRef.id,
+        entityName: `Crear Medio de Pago: ${data.name}`,
+        action: 'create',
+        details: `Creado medio de pago ${data.name} (${data.category})`,
+      });
+      return docRef.id;
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.CREATE, 'payment_methods');
+      throw err;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const updatePaymentMethod = async (id: string, updates: Partial<PaymentMethodItem>): Promise<void> => {
+    setActionLoading(true);
+    try {
+      const docRef = doc(db, 'payment_methods', id);
+      const sanitized = sanitizeFirestoreData({
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      });
+      await updateDoc(docRef, sanitized);
+      await logAuditAction({
+        entityType: 'branch',
+        entityId: id,
+        entityName: `Actualizar Medio de Pago: ${updates.name || id}`,
+        action: 'update',
+        details: `Actualizado medio de pago ${id}`,
+      });
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.UPDATE, `payment_methods/${id}`);
+      throw err;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const deletePaymentMethod = async (id: string): Promise<void> => {
+    setActionLoading(true);
+    try {
+      const target = paymentMethods.find((p) => p.id === id);
+      const docRef = doc(db, 'payment_methods', id);
+      await deleteDoc(docRef);
+      await logAuditAction({
+        entityType: 'branch',
+        entityId: id,
+        entityName: `Eliminar Medio de Pago: ${target?.name || id}`,
+        action: 'delete',
+        details: `Eliminado medio de pago ${target?.name || id}`,
+      });
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.DELETE, `payment_methods/${id}`);
+      throw err;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const togglePaymentMethodStatus = async (id: string, status?: boolean): Promise<void> => {
+    const target = paymentMethods.find((p) => p.id === id);
+    if (!target) return;
+    const nextStatus = status !== undefined ? status : !target.isActive;
+    await updatePaymentMethod(id, { isActive: nextStatus });
+  };
+
+  // CRUD de Otros Ingresos
+  const createOtherIncome = async (data: {
+    date?: string;
+    concept: string;
+    thirdParty?: string;
+    paymentMethod: PaymentMethod;
+    amount: number;
+    observations?: string;
+  }): Promise<OtherIncome> => {
+    setActionLoading(true);
+    try {
+      const now = new Date().toISOString();
+      const incomeDate = data.date || now;
+      const consecutivo = `ING-${String(otherIncomes.length + 1).padStart(4, '0')}`;
+      
+      const newIncomeId = `inc-${Date.now()}`;
+      let cashMovementId: string | undefined = undefined;
+
+      // Si es en efectivo y hay turno activo, registrar ingreso en caja
+      const isCash =
+        data.paymentMethod === 'efectivo' ||
+        (paymentMethods.find((p) => p.name.toLowerCase() === data.paymentMethod.toLowerCase())?.isCashType ?? false);
+      if (isCash && activeShift) {
+        await addCashMovement(
+          'ingreso',
+          data.amount,
+          `Otro Ingreso #${consecutivo}: ${data.concept} (${data.thirdParty || 'General'})`
+        );
+      }
+
+      const originBranch = branches.find((b) => b.id === currentBranchId) || branches[0];
+      const branchSnapshot: BranchReceiptSnapshot = {
+        branchId: originBranch?.id || currentBranchId,
+        name: originBranch?.name || currentBranch?.name || 'SISTEMA COLMENA RESTAURANTE',
+        nit: originBranch?.nit || currentBranch?.nit || '901.458.920-4',
+        address: originBranch?.address || currentBranch?.address || '',
+        phone: originBranch?.phone || currentBranch?.phone || '',
+        logoUrl: originBranch?.logoUrl || '',
+        notes: originBranch?.notes || '',
+        printConfig: originBranch?.printConfig || DEFAULT_BRANCH_PRINT_CONFIG,
+        resolutionDian: originBranch?.receiptConfig?.resolutionDian || '',
+        prefix: originBranch?.receiptConfig?.prefix || 'ING-',
+        issuedAt: now,
+      };
+
+      const newIncome: OtherIncome = {
+        id: newIncomeId,
+        consecutivo,
+        branchId: currentBranchId,
+        branchSnapshot,
+        date: incomeDate,
+        concept: data.concept,
+        thirdParty: data.thirdParty || undefined,
+        paymentMethod: data.paymentMethod,
+        amount: data.amount,
+        observations: data.observations || undefined,
+        status: 'activo',
+        userId: staffName,
+        userName: staffName,
+        shiftId: activeShift?.id,
+        cashMovementId,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      const sanitized = sanitizeFirestoreData(newIncome);
+      await setDoc(doc(db, 'other_incomes', newIncomeId), sanitized);
+
+      await logAuditAction({
+        entityType: 'branch',
+        entityId: newIncomeId,
+        entityName: `Otro Ingreso #${consecutivo}`,
+        action: 'create',
+        details: `Registrado ingreso de ${formatCOP(data.amount)} (${data.concept}) vía ${data.paymentMethod}`,
+      });
+
+      return newIncome;
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.CREATE, 'other_incomes');
+      throw err;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const updateOtherIncome = async (id: string, updates: Partial<OtherIncome>): Promise<void> => {
+    setActionLoading(true);
+    try {
+      const target = otherIncomes.find((i) => i.id === id);
+      if (!target) throw new Error('Ingreso no encontrado');
+
+      const now = new Date().toISOString();
+      const docRef = doc(db, 'other_incomes', id);
+      const sanitized = sanitizeFirestoreData({
+        ...updates,
+        updatedAt: now,
+      });
+
+      await updateDoc(docRef, sanitized);
+
+      await logAuditAction({
+        entityType: 'branch',
+        entityId: id,
+        entityName: `Edición Ingreso #${target.consecutivo}`,
+        action: 'update',
+        details: `Actualizado ingreso #${target.consecutivo}. Monto: ${updates.amount ? formatCOP(updates.amount) : formatCOP(target.amount)}`,
+      });
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.UPDATE, `other_incomes/${id}`);
+      throw err;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const voidOtherIncome = async (id: string, reason: string): Promise<void> => {
+    setActionLoading(true);
+    try {
+      const target = otherIncomes.find((i) => i.id === id);
+      if (!target) throw new Error('Ingreso no encontrado');
+      if (target.status === 'anulado') throw new Error('Este ingreso ya fue anulado previamente');
+
+      const now = new Date().toISOString();
+      const docRef = doc(db, 'other_incomes', id);
+
+      // Si fue en efectivo y hay turno activo, registrar egreso para reversión en caja
+      const isCash =
+        target.paymentMethod === 'efectivo' ||
+        (paymentMethods.find((p) => p.name.toLowerCase() === target.paymentMethod.toLowerCase())?.isCashType ?? false);
+      if (isCash && activeShift) {
+        await addCashMovement(
+          'egreso',
+          target.amount,
+          `Anulación Otro Ingreso #${target.consecutivo} (${target.concept}): ${reason}`
+        );
+      }
+
+      await updateDoc(docRef, {
+        status: 'anulado',
+        voidReason: reason,
+        voidedAt: now,
+        voidedBy: staffName,
+        updatedAt: now,
+      });
+
+      await logAuditAction({
+        entityType: 'branch',
+        entityId: id,
+        entityName: `Anulación Ingreso #${target.consecutivo}`,
+        action: 'status_change',
+        details: `Ingreso #${target.consecutivo} de ${formatCOP(target.amount)} anulado. Motivo: ${reason}`,
+      });
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.UPDATE, `other_incomes/${id}`);
+      throw err;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const voidPayment = async (paymentId: string, reason: string): Promise<void> => {
+    setActionLoading(true);
+    try {
+      const target = payments.find((p) => p.id === paymentId);
+      if (!target) throw new Error('Pago no encontrado');
+      if (target.status === 'anulado') throw new Error('Este pago ya fue anulado');
+
+      const now = new Date().toISOString();
+      const docRef = doc(db, 'payments', paymentId);
+
+      // Si fue en efectivo y hay turno activo, revertir en caja
+      if (target.method === 'efectivo' && activeShift) {
+        await addCashMovement(
+          'egreso',
+          target.amountPaid,
+          `Anulación Pago Venta #${target.orderNumber}: ${reason}`
+        );
+      }
+
+      await updateDoc(docRef, {
+        status: 'anulado',
+        voidReason: reason,
+        voidedAt: now,
+        voidedBy: staffName,
+      });
+
+      await logAuditAction({
+        entityType: 'branch',
+        entityId: paymentId,
+        entityName: `Anulación Pago #${target.orderNumber}`,
+        action: 'status_change',
+        details: `Pago de venta #${target.orderNumber} por ${formatCOP(target.amountPaid)} anulado. Motivo: ${reason}`,
+      });
+    } catch (err: any) {
+      handleFirestoreError(err, OperationType.UPDATE, `payments/${paymentId}`);
+      throw err;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // Helper para convertir Product y MenuItem unificados para pedidos, POS y comandas
   const activeProductsAsMenuItems: MenuItem[] = React.useMemo(() => {
     const stationMap: Record<string, KitchenStation> = {
@@ -4188,6 +4754,9 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         updateComandaItemStatus,
         closeAndPayOrder,
         openCashShift,
+        addCashBase,
+        updateCashBase,
+        deleteCashBase,
         closeCashShift,
         addCashMovement,
         updateInventoryStock,
@@ -4199,6 +4768,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         // Módulo 11: Compras y Proveedores
         suppliers,
         purchases,
+        expenses,
         supplierAdvances,
         purchasePayments,
         supplierAdvanceReintegros,
@@ -4206,6 +4776,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         updateSupplier,
         toggleSupplierStatus,
         createPurchase,
+        createExpense,
         createSupplierAdvance,
         registerSupplierAdvanceReintegro,
         voidSupplierAdvance,
@@ -4236,6 +4807,20 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         editAbono,
         voidAbono,
 
+        // Medios de Pago
+        paymentMethods,
+        createPaymentMethod,
+        updatePaymentMethod,
+        deletePaymentMethod,
+        togglePaymentMethodStatus,
+
+        // Otros Ingresos
+        otherIncomes,
+        createOtherIncome,
+        updateOtherIncome,
+        voidOtherIncome,
+        voidPayment,
+
         clearAllTransactionalRecords: async () => {
           if (actionLoading) throw new Error('Operación en proceso');
           setActionLoading(true);
@@ -4253,6 +4838,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               'separados',
               'cartera',
               'abonos',
+              'other_incomes',
+              'expenses',
               'auditLogs',
               'audit_logs',
               'inventoryMovements',

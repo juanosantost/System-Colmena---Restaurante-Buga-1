@@ -18,15 +18,23 @@ import { RestaurantConfigView } from './components/config/RestaurantConfigView';
 import { ProductCatalogView } from './components/catalog/ProductCatalogView';
 import { DeliveryAndPickupView } from './components/orders/DeliveryAndPickupView';
 import { PurchasesView } from './components/purchases/PurchasesView';
+import { DisbursementsView } from './components/purchases/DisbursementsView';
+import { ExpenseRegistrationView } from './components/purchases/ExpenseRegistrationView';
+import { PurchaseRegistrationView } from './components/purchases/PurchaseRegistrationView';
 import { CustomersView } from './components/customers/CustomersView';
 import { SeparadosView } from './components/separados/SeparadosView';
 import { CarteraView } from './components/cartera/CarteraView';
 import { ReportsView } from './components/reports/ReportsView';
+import { PaymentMethodsManagementView } from './components/admin/PaymentMethodsManagementView';
+import { IncomesView } from './components/incomes/IncomesView';
+import { OtherIncomeRegistrationView } from './components/incomes/OtherIncomeRegistrationView';
+import { Supplier } from './types';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
 const MainAppContent: React.FC = () => {
   const { isAuthenticated, isLoading, currentUser, canAccess } = useAuth();
   const [currentView, setCurrentView] = useState<AppView>('home');
+  const [selectedSupplierForPurchase, setSelectedSupplierForPurchase] = useState<Supplier | null>(null);
 
   if (isLoading) {
     return (
@@ -48,6 +56,7 @@ const MainAppContent: React.FC = () => {
       view === 'home' ||
       view === 'config' ||
       view === 'config-mesas' ||
+      view === 'medios-pago' ||
       view === 'catalogo' ||
       view === 'domicilios' ||
       view === 'clientes' ||
@@ -57,7 +66,12 @@ const MainAppContent: React.FC = () => {
       view === 'compras' ||
       view === 'proveedores' ||
       view === 'cuentas-por-pagar' ||
-      view === 'anticipos-proveedores'
+      view === 'anticipos-proveedores' ||
+      view === 'desembolsos' ||
+      view === 'registrar-gasto' ||
+      view === 'registrar-compra' ||
+      view === 'ingresos' ||
+      view === 'otros-ingresos'
     )
       return true;
     if (currentUser.role === 'administrador' || currentUser.role === 'supervisor') return true;
@@ -100,15 +114,66 @@ const MainAppContent: React.FC = () => {
           {currentView === 'domicilios' && <DeliveryAndPickupView />}
           {currentView === 'cocina' && <KitchenKDSView />}
           {currentView === 'caja' && <CashView />}
+          {currentView === 'ingresos' && (
+            <IncomesView onNavigateToView={(v) => setCurrentView(v as AppView)} />
+          )}
+          {currentView === 'otros-ingresos' && (
+            <OtherIncomeRegistrationView onBack={() => setCurrentView('ingresos')} />
+          )}
           {currentView === 'inventario' && <InventoryView />}
-          {currentView === 'compras' && <PurchasesView initialTab="compras" />}
-          {currentView === 'proveedores' && <PurchasesView initialTab="proveedores" />}
-          {currentView === 'cuentas-por-pagar' && <PurchasesView initialTab="cuentas" />}
-          {currentView === 'anticipos-proveedores' && <PurchasesView initialTab="anticipos" />}
+          {currentView === 'compras' && (
+            <DisbursementsView onNavigateToView={(v) => setCurrentView(v as AppView)} />
+          )}
+          {currentView === 'desembolsos' && (
+            <DisbursementsView onNavigateToView={(v) => setCurrentView(v as AppView)} />
+          )}
+          {currentView === 'registrar-gasto' && (
+            <ExpenseRegistrationView onBack={() => setCurrentView('desembolsos')} />
+          )}
+          {currentView === 'registrar-compra' && (
+            <PurchaseRegistrationView
+              initialSupplier={selectedSupplierForPurchase}
+              onBack={() => {
+                setSelectedSupplierForPurchase(null);
+                setCurrentView('desembolsos');
+              }}
+            />
+          )}
+          {currentView === 'proveedores' && (
+            <PurchasesView
+              initialTab="proveedores"
+              onNavigateToView={(v) => setCurrentView(v as AppView)}
+              onNavigateToPurchaseWithSupplier={(sup) => {
+                setSelectedSupplierForPurchase(sup);
+                setCurrentView('registrar-compra');
+              }}
+            />
+          )}
+          {currentView === 'cuentas-por-pagar' && (
+            <PurchasesView
+              initialTab="cuentas"
+              onNavigateToView={(v) => setCurrentView(v as AppView)}
+              onNavigateToPurchaseWithSupplier={(sup) => {
+                setSelectedSupplierForPurchase(sup);
+                setCurrentView('registrar-compra');
+              }}
+            />
+          )}
+          {currentView === 'anticipos-proveedores' && (
+            <PurchasesView
+              initialTab="anticipos"
+              onNavigateToView={(v) => setCurrentView(v as AppView)}
+              onNavigateToPurchaseWithSupplier={(sup) => {
+                setSelectedSupplierForPurchase(sup);
+                setCurrentView('registrar-compra');
+              }}
+            />
+          )}
           {currentView === 'clientes' && <CustomersView onNavigateToView={(v) => setCurrentView(v as AppView)} />}
           {currentView === 'separados' && <SeparadosView />}
           {currentView === 'cartera' && <CarteraView />}
           {currentView === 'reportes' && <ReportsView />}
+          {currentView === 'medios-pago' && <PaymentMethodsManagementView />}
           {currentView === 'usuarios' && <UsersManagementView />}
           {currentView === 'sucursales' && <BranchesManagementView />}
           {currentView === 'config-mesas' && <RestaurantConfigView />}

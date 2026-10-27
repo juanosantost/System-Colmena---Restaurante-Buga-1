@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { Order, PaymentMethod, PaymentSplit, Payment } from '../../types';
 import { formatCOP, splitBillEqually } from '../../utils/calculations';
@@ -27,7 +27,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onClose,
   onPaymentComplete,
 }) => {
-  const { closeAndPayOrder, activeShift, actionLoading } = useRestaurant();
+  const { closeAndPayOrder, activeShift, actionLoading, paymentMethods } = useRestaurant();
 
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('efectivo');
   const [includeTip, setIncludeTip] = useState<boolean>(order.tip > 0);
@@ -75,12 +75,29 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
 
-  const methodsList: { id: PaymentMethod; label: string; icon: any; desc: string }[] = [
-    { id: 'efectivo', label: 'Efectivo', icon: Banknote, desc: 'Cálculo de cambio/vueltas' },
-    { id: 'tarjeta', label: 'Tarjeta / Datáfono', icon: CreditCard, desc: 'Crédito o Débito' },
-    { id: 'nequi_daviplata', label: 'Nequi / Daviplata', icon: Smartphone, desc: 'Transferencia móvil inmediata' },
-    { id: 'mixto', label: 'Pago Mixto', icon: Layers, desc: 'Dividir métodos de pago' },
-  ];
+  const methodsList: { id: PaymentMethod; label: string; icon: any; desc: string }[] = useMemo(() => {
+    const active = paymentMethods.filter((p) => p.isActive);
+    if (active.length === 0) {
+      return [
+        { id: 'efectivo', label: 'Efectivo', icon: Banknote, desc: 'Cálculo de cambio/vueltas' },
+        { id: 'tarjeta', label: 'Tarjeta / Datáfono', icon: CreditCard, desc: 'Crédito o Débito' },
+        { id: 'nequi_daviplata', label: 'Nequi / Daviplata', icon: Smartphone, desc: 'Transferencia móvil inmediata' },
+        { id: 'mixto', label: 'Pago Mixto', icon: Layers, desc: 'Dividir métodos de pago' },
+      ];
+    }
+    const mapped = active.map((p) => {
+      let icon = CreditCard;
+      if (p.category === 'efectivo') icon = Banknote;
+      else if (p.category === 'billetera_digital') icon = Smartphone;
+      return {
+        id: (p.name.toLowerCase().replace(/\s+/g, '_')) as PaymentMethod,
+        label: p.name,
+        icon,
+        desc: p.description || (p.isCashType ? 'Efectivo en caja' : p.bankName ? `Canal ${p.bankName}` : 'Medio habilitado'),
+      };
+    });
+    return [...mapped, { id: 'mixto' as PaymentMethod, label: 'Pago Mixto', icon: Layers, desc: 'Dividir métodos de pago' }];
+  }, [paymentMethods]);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 overflow-y-auto">

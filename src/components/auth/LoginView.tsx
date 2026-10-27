@@ -136,7 +136,7 @@ export const LoginView: React.FC = () => {
             disabled={isLoading}
             className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#B77900] via-[#D6A21A] to-[#B77900] hover:brightness-110 text-[#181818] font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-[#B77900]/25 transition-all cursor-pointer"
           >
-            <LogIn className="w-4 h-4" />
+            <LogIn className="w-4 h-4 text-[#181818]" />
             <span>{isLoading ? 'Verificando...' : 'Iniciar Sesión'}</span>
           </button>
         </form>

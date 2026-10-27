@@ -590,6 +590,13 @@ export interface CashShift {
   openedAt: string;
   closedAt?: string | null;
   initialCash: number;
+  baseEntries?: {
+    id: string;
+    amount: number;
+    reason: string;
+    createdAt: string;
+    userName: string;
+  }[];
   salesCash: number;
   salesCard: number;
   salesTransfer: number;
@@ -600,6 +607,22 @@ export interface CashShift {
   difference?: number | null;
   status: CashShiftStatus;
   notes?: string;
+}
+
+export interface Expense {
+  id: string;
+  branchId: string;
+  category: string;
+  concept: string;
+  thirdParty: string;
+  paymentMethod: string;
+  amount: number;
+  observations: string;
+  createdAt: string;
+  userId: string;
+  userName: string;
+  status: 'activo' | 'anulado';
+  consecutivo: string;
 }
 
 export interface CashMovement {
@@ -614,7 +637,36 @@ export interface CashMovement {
   createdAt: string;
 }
 
-export type PaymentMethod = 'efectivo' | 'tarjeta' | 'nequi_daviplata' | 'transferencia' | 'mixto';
+export type PaymentMethodCategory =
+  | 'efectivo'
+  | 'transferencia'
+  | 'tarjeta'
+  | 'billetera_digital'
+  | 'bono'
+  | 'otro';
+
+export interface PaymentMethodItem {
+  id: string;
+  name: string;
+  category: PaymentMethodCategory;
+  description?: string;
+  isActive: boolean;
+  requiresReference?: boolean;
+  accountNumber?: string;
+  bankName?: string;
+  isCashType?: boolean;
+  branchId?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export type PaymentMethod =
+  | 'efectivo'
+  | 'tarjeta'
+  | 'nequi_daviplata'
+  | 'transferencia'
+  | 'mixto'
+  | (string & {});
 
 export interface PaymentSplit {
   method: PaymentMethod;
@@ -641,6 +693,33 @@ export interface Payment {
   customerNitOrCedula?: string;
   createdAt: string;
   branchSnapshot?: BranchReceiptSnapshot;
+  status?: 'completado' | 'anulado';
+  voidReason?: string;
+  voidedAt?: string;
+  voidedBy?: string;
+}
+
+export interface OtherIncome {
+  id: string;
+  consecutivo: string; // Ej: ING-0001
+  branchId: string;
+  branchSnapshot?: BranchReceiptSnapshot;
+  date: string; // Fecha y hora (ISO)
+  concept: string; // Reintegro, Recuperación de dinero, Venta material usado, etc.
+  thirdParty?: string; // Tercero / Referencia
+  paymentMethod: PaymentMethod;
+  amount: number;
+  observations?: string;
+  status: 'activo' | 'anulado';
+  userId: string;
+  userName: string;
+  shiftId?: string;
+  cashMovementId?: string;
+  voidReason?: string;
+  voidedAt?: string;
+  voidedBy?: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export interface ToastMessage {
