@@ -28,6 +28,10 @@ export interface ColmenaUser {
   role: UserRole;
   authorizedBranchIds: string[]; // Lista de IDs de sucursales a las que tiene acceso
   isActive: boolean;
+  isDeleted?: boolean;
+  deletedAt?: string;
+  deletedBy?: string;
+  deleteReason?: string;
   createdAt: string; // Fecha en formato ISO / Colombia
   lastLoginAt?: string;
   phone?: string;

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { useToast } from '../../context/ToastContext';
+import { useMenuConfig } from '../../context/MenuConfigContext';
 import { normalizeUserRole } from '../../utils/auth';
 import {
   LayoutGrid,
@@ -63,6 +64,7 @@ export type AppView =
   | 'sucursales'
   | 'config'
   | 'config-mesas'
+  | 'config-botones'
   | 'medios-pago';
 
 interface AppLayoutProps {
@@ -173,89 +175,81 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     }
   };
 
-  // Definición de ítems del menú con control de permisos
-  interface MenuOption {
-    id: AppView;
-    label: string;
-    icon: any;
-    badge?: string | number;
-    badgeColor?: string;
-    requiresAdmin?: boolean;
-    moduleKey: string;
-  }
+  const { menuConfig } = useMenuConfig();
+  const normRole = normalizeUserRole(currentUser?.role);
 
-  interface MenuSection {
-    sectionTitle: string;
-    items: MenuOption[];
-  }
+  // Mapeo dinámico de componentes de iconos Lucide
+  const ICON_MAP: Record<string, any> = {
+    Home,
+    ClipboardList,
+    LayoutGrid,
+    Flame,
+    Bike,
+    Receipt,
+    TrendingUp,
+    UtensilsCrossed,
+    Boxes,
+    DollarSign,
+    Building,
+    CreditCard,
+    Users,
+    BookmarkCheck,
+    BarChart3,
+    Building2,
+    Settings,
+    Sliders,
+  };
 
-  const rawSections: MenuSection[] = [
-    {
-      sectionTitle: 'OPERACIÓN',
-      items: [
-        { id: 'home', label: 'Inicio', icon: Home, moduleKey: 'home' },
-        { id: 'pedidos', label: 'Pedidos Comercial', icon: ClipboardList, badge: activeOrders.length > 0 ? activeOrders.length : undefined, badgeColor: 'bg-[#292212] text-[#D6A21A] border border-[#B77900]/40', moduleKey: 'pedidos' },
-        { id: 'mesas', label: 'Mesas & Salón', icon: LayoutGrid, badge: occupiedTables > 0 ? `${occupiedTables}/${tables.length}` : undefined, badgeColor: 'bg-[#B77900] text-[#181818]', moduleKey: 'mesas' },
-        { id: 'cocina', label: 'Cocina (KDS)', icon: Flame, badge: pendingComandas > 0 ? pendingComandas : undefined, badgeColor: 'bg-amber-600 text-white animate-pulse', moduleKey: 'cocina' },
-        { id: 'domicilios', label: 'Domicilios & Llevar', icon: Bike, moduleKey: 'domicilios' },
-        { id: 'caja', label: 'Caja & Movimientos', icon: Receipt, moduleKey: 'caja' },
-        { id: 'ingresos', label: 'Ingresos', icon: TrendingUp, moduleKey: 'caja' },
-      ],
-    },
-    {
-      sectionTitle: 'PRODUCTOS E INVENTARIO',
-      items: [
-        { id: 'catalogo', label: 'Menú & Productos', icon: UtensilsCrossed, moduleKey: 'catalogo' },
-        { id: 'inventario', label: 'Ingredientes e Inventario', icon: Boxes, badge: lowStockItems > 0 ? `! ${lowStockItems}` : undefined, badgeColor: 'bg-red-900/80 text-red-200 border border-red-700/50', moduleKey: 'inventario' },
-      ],
-    },
-    {
-      sectionTitle: 'COMPRAS Y PROVEEDORES',
-      items: [
-        { id: 'desembolsos', label: 'Desembolsos', icon: DollarSign, moduleKey: 'compras' },
-        { id: 'proveedores', label: 'Proveedores', icon: Building, moduleKey: 'compras' },
-        { id: 'cuentas-por-pagar', label: 'Cuentas por Pagar', icon: CreditCard, moduleKey: 'compras' },
-        { id: 'anticipos-proveedores', label: 'Anticipos a Proveedores', icon: DollarSign, moduleKey: 'compras' },
-      ],
-    },
-    {
-      sectionTitle: 'GESTIÓN COMERCIAL',
-      items: [
-        { id: 'clientes', label: 'Clientes & CRM', icon: Users, moduleKey: 'clientes' },
-        { id: 'separados', label: 'Separados & Reservas', icon: BookmarkCheck, badge: 'Layaway', badgeColor: 'bg-[#B77900] text-[#181818]', moduleKey: 'separados' },
-        { id: 'cartera', label: 'Cartera & Cobros', icon: CreditCard, badge: 'Créditos', badgeColor: 'bg-[#B77900] text-[#181818]', moduleKey: 'cartera' },
-      ],
-    },
-    {
-      sectionTitle: 'ADMINISTRACIÓN',
-      items: [
-        { id: 'reportes', label: 'Informes & Estadísticas', icon: BarChart3, moduleKey: 'reportes' },
-        { id: 'medios-pago', label: 'Medios de Pago', icon: CreditCard, requiresAdmin: false, moduleKey: 'caja' },
-        { id: 'usuarios', label: 'Usuarios & Personal', icon: Users, requiresAdmin: true, moduleKey: 'usuarios' },
-        { id: 'sucursales', label: 'Sucursales & Facturación', icon: Building2, requiresAdmin: true, moduleKey: 'sucursales' },
-        { id: 'config-mesas', label: 'Config. Salones & Mesas', icon: Settings, requiresAdmin: false, moduleKey: 'config-mesas' },
-        { id: 'config', label: 'Matriz de Permisos', icon: Sliders, moduleKey: 'config' },
-      ],
-    },
-  ];
+  // Construir secciones visibles y ordenadas dinámicamente según configuración de administración y rol
+  const sortedSections = [...(menuConfig.sections || [])].sort((a, b) => a.order - b.order);
 
-  const visibleSections = rawSections
-    .map((sec) => ({
-      ...sec,
-      items: sec.items.filter((item) => {
-        const normRole = normalizeUserRole(currentUser?.role);
-        if (normRole === 'administrador') return true;
-        if (normRole === 'cocinero') {
-          // Cocinero: Acceso únicamente a la parte de cocina
-          return item.id === 'cocina';
-        }
-        if (normRole === 'asesor') {
-          // Asesor: Acceso al apartado operación
-          return sec.sectionTitle === 'OPERACIÓN';
-        }
-        return false;
-      }),
-    }))
+  const visibleSections = sortedSections
+    .map((sec) => {
+      // Filtrar y ordenar botones asignados a esta sección
+      const items = (menuConfig.buttons || [])
+        .filter((btn) => {
+          if (btn.sectionId !== sec.id) return false;
+          if (btn.isVisible === false) return false;
+          return Array.isArray(btn.allowedRoles) && btn.allowedRoles.includes(normRole);
+        })
+        .sort((a, b) => a.order - b.order)
+        .map((btn) => {
+          // Resolver insignias numéricas y de alerta dinámicamente
+          let badge: string | number | undefined = undefined;
+          let badgeColor: string | undefined = undefined;
+
+          if (btn.badgeType === 'activeOrders' && activeOrders.length > 0) {
+            badge = activeOrders.length;
+            badgeColor = 'bg-[#292212] text-[#D6A21A] border border-[#B77900]/40';
+          } else if (btn.badgeType === 'occupiedTables' && occupiedTables > 0) {
+            badge = `${occupiedTables}/${tables.length}`;
+            badgeColor = 'bg-[#B77900] text-[#181818]';
+          } else if (btn.badgeType === 'pendingComandas' && pendingComandas > 0) {
+            badge = pendingComandas;
+            badgeColor = 'bg-amber-600 text-white animate-pulse';
+          } else if (btn.badgeType === 'lowStock' && lowStockItems > 0) {
+            badge = `! ${lowStockItems}`;
+            badgeColor = 'bg-red-900/80 text-red-200 border border-red-700/50';
+          } else if (btn.badgeText) {
+            badge = btn.badgeText;
+            badgeColor = 'bg-[#B77900] text-[#181818]';
+          }
+
+          return {
+            id: btn.id as AppView,
+            label: btn.label,
+            icon: ICON_MAP[btn.iconName] || Home,
+            badge,
+            badgeColor,
+            moduleKey: btn.id,
+          };
+        });
+
+      return {
+        sectionTitle: sec.title,
+        items,
+      };
+    })
     .filter((sec) => sec.items.length > 0);
 
   const getRoleDisplayName = (role: string = '') => {

@@ -48,22 +48,33 @@ test('canUserAccessBranch restricts non-admin to authorized branches only', () =
   assert.equal(canUserAccessBranch(cajeroUser, 'sede-chapinero'), false);
 });
 
-test('canUserAccessModule enforces strict RBAC per role', () => {
+test('canUserAccessModule enforces strict RBAC for the 3 roles', () => {
+  // 1. Administrador: Acceso total
   assert.equal(canUserAccessModule('administrador', 'usuarios'), true);
   assert.equal(canUserAccessModule('administrador', 'sucursales'), true);
   assert.equal(canUserAccessModule('administrador', 'caja'), true);
+  assert.equal(canUserAccessModule('administrador', 'inventario'), true);
+  assert.equal(canUserAccessModule('administrador', 'reportes'), true);
+  assert.equal(canUserAccessModule('administrador', 'cocina'), true);
 
-  // Cajero cannot access user management or branches
-  assert.equal(canUserAccessModule('cajero', 'usuarios'), false);
-  assert.equal(canUserAccessModule('cajero', 'sucursales'), false);
-  assert.equal(canUserAccessModule('cajero', 'caja'), true);
-  assert.equal(canUserAccessModule('cajero', 'cocina'), false);
+  // 2. Asesor: Acceso al apartado operación (pedidos, mesas, domicilios, caja, ingresos, cocina)
+  assert.equal(canUserAccessModule('asesor', 'pedidos'), true);
+  assert.equal(canUserAccessModule('asesor', 'mesas'), true);
+  assert.equal(canUserAccessModule('asesor', 'caja'), true);
+  assert.equal(canUserAccessModule('asesor', 'ingresos'), true);
+  assert.equal(canUserAccessModule('asesor', 'cocina'), true);
+  assert.equal(canUserAccessModule('asesor', 'usuarios'), false);
+  assert.equal(canUserAccessModule('asesor', 'sucursales'), false);
+  assert.equal(canUserAccessModule('asesor', 'inventario'), false);
+  assert.equal(canUserAccessModule('asesor', 'reportes'), false);
 
-  // Cocina only accesses kitchen and inventory
-  assert.equal(canUserAccessModule('cocina', 'cocina'), true);
-  assert.equal(canUserAccessModule('cocina', 'inventario'), true);
-  assert.equal(canUserAccessModule('cocina', 'caja'), false);
-  assert.equal(canUserAccessModule('cocina', 'usuarios'), false);
+  // 3. Cocinero: Acceso únicamente a la parte de cocina
+  assert.equal(canUserAccessModule('cocinero', 'cocina'), true);
+  assert.equal(canUserAccessModule('cocinero', 'caja'), false);
+  assert.equal(canUserAccessModule('cocinero', 'usuarios'), false);
+  assert.equal(canUserAccessModule('cocinero', 'inventario'), false);
+  assert.equal(canUserAccessModule('cocinero', 'pedidos'), false);
+  assert.equal(canUserAccessModule('cocinero', 'mesas'), false);
 });
 
 test('validateDocumentNumber and validateEmail validate correctly', () => {

@@ -20,7 +20,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType } from '../services/firebase';
 import { ColmenaUser, UserRole, Branch, ReceiptConfig, BranchPrintConfig, DEFAULT_BRANCH_PRINT_CONFIG } from '../types';
-import { canUserAccessBranch, canUserAccessModule } from '../utils/auth';
+import { canUserAccessBranch, canUserAccessModule, normalizeUserRole } from '../utils/auth';
 
 interface AuthContextType {
   firebaseUser: FirebaseUser | null;
@@ -54,6 +54,9 @@ interface AuthContextType {
     data: Partial<Pick<ColmenaUser, 'fullName' | 'documentNumber' | 'role' | 'authorizedBranchIds' | 'phone'>>
   ) => Promise<void>;
   toggleUserActiveStatus: (userId: string, currentStatus: boolean) => Promise<void>;
+  softDeleteUser: (userId: string, reason?: string) => Promise<void>;
+  restoreUser: (userId: string) => Promise<void>;
+  permanentDeleteUser: (userId: string) => Promise<void>;
   createNewBranch: (branchData: Omit<Branch, 'id'>) => Promise<string>;
   updateBranchData: (branchId: string, branchData: Partial<Branch>) => Promise<void>;
   canAccess: (moduleName: string) => boolean;
@@ -470,6 +473,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       throw new Error('Usuario no registrado en el sistema. Debe estar registrado en el módulo de usuarios por un administrador.');
     }
 
+    if (matched.isDeleted) {
+      throw new Error('Este usuario se encuentra en la papelera de usuarios eliminados. Un administrador debe restablecerlo.');
+    }
+
     if (!matched.isActive) {
       throw new Error('Este usuario se encuentra inactivo en el sistema.');
     }
@@ -568,7 +575,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Activar o desactivar usuario (Soft delete)
+  // Activar o desactivar usuario
   const toggleUserActiveStatus = async (userId: string, currentStatus: boolean) => {
     await updateDoc(doc(db, 'users', userId), {
       isActive: !currentStatus,
@@ -578,6 +585,105 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (currentUser && currentUser.id === userId) {
       setCurrentUser((prev) => (prev ? { ...prev, isActive: !currentStatus } : null));
     }
+  };
+
+  // Mover usuario a la papelera (Soft delete con motivo y fecha)
+  const softDeleteUser = async (userId: string, reason: string = 'Eliminado por error o retiro') => {
+    const userToDelete = allUsers.find((u) => u.id === userId);
+    if (!userToDelete) throw new Error('Usuario no encontrado.');
+
+    if (currentUser && currentUser.id === userId) {
+      throw new Error('No puedes eliminar tu propio usuario en sesión activa.');
+    }
+
+    if (normalizeUserRole(userToDelete.role) === 'administrador') {
+      const activeAdmins = allUsers.filter(
+        (u) => normalizeUserRole(u.role) === 'administrador' && !u.isDeleted && u.isActive
+      );
+      if (activeAdmins.length <= 1) {
+        throw new Error('No puedes eliminar al único Administrador activo del sistema.');
+      }
+    }
+
+    const now = new Date().toISOString();
+    await updateDoc(doc(db, 'users', userId), {
+      isDeleted: true,
+      deletedAt: now,
+      deletedBy: currentUser?.fullName || 'Administrador',
+      deleteReason: reason.trim() || 'Eliminado desde administración',
+      isActive: false,
+      updatedAt: now,
+    });
+
+    // Actualización local
+    setAllUsers((prev) =>
+      prev.map((u) =>
+        u.id === userId
+          ? {
+              ...u,
+              isDeleted: true,
+              deletedAt: now,
+              deletedBy: currentUser?.fullName || 'Administrador',
+              deleteReason: reason.trim() || 'Eliminado desde administración',
+              isActive: false,
+            }
+          : u
+      )
+    );
+  };
+
+  // Restablecer usuario eliminado desde la papelera
+  const restoreUser = async (userId: string) => {
+    const userToRestore = allUsers.find((u) => u.id === userId);
+    if (!userToRestore) throw new Error('Usuario no encontrado.');
+
+    const now = new Date().toISOString();
+    await updateDoc(doc(db, 'users', userId), {
+      isDeleted: false,
+      deletedAt: null,
+      deletedBy: null,
+      deleteReason: null,
+      isActive: true,
+      updatedAt: now,
+    });
+
+    // Actualización local
+    setAllUsers((prev) =>
+      prev.map((u) =>
+        u.id === userId
+          ? {
+              ...u,
+              isDeleted: false,
+              deletedAt: undefined,
+              deletedBy: undefined,
+              deleteReason: undefined,
+              isActive: true,
+            }
+          : u
+      )
+    );
+  };
+
+  // Eliminación definitiva en Firestore
+  const permanentDeleteUser = async (userId: string) => {
+    const userToDelete = allUsers.find((u) => u.id === userId);
+    if (!userToDelete) throw new Error('Usuario no encontrado.');
+
+    if (currentUser && currentUser.id === userId) {
+      throw new Error('No puedes eliminar tu propio usuario en sesión activa.');
+    }
+
+    if (normalizeUserRole(userToDelete.role) === 'administrador') {
+      const activeAdmins = allUsers.filter(
+        (u) => normalizeUserRole(u.role) === 'administrador' && !u.isDeleted && u.isActive
+      );
+      if (activeAdmins.length <= 1) {
+        throw new Error('No puedes eliminar al único Administrador del sistema.');
+      }
+    }
+
+    await deleteDoc(doc(db, 'users', userId));
+    setAllUsers((prev) => prev.filter((u) => u.id !== userId));
   };
 
   // Crear nueva sucursal (ID autogenerado e inmutable)
@@ -674,6 +780,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createNewUser,
         updateUserData,
         toggleUserActiveStatus,
+        softDeleteUser,
+        restoreUser,
+        permanentDeleteUser,
         createNewBranch,
         updateBranchData,
         canAccess,

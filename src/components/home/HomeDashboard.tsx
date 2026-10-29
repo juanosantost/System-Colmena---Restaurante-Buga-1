@@ -86,10 +86,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({ onNavigate }) => {
   const [receiptPayment, setReceiptPayment] = useState<Payment | null>(null);
   const [receiptOrder, setReceiptOrder] = useState<Order | null>(null);
 
-  // Modal de confirmación para limpiar registros demo
-  const [showConfirmClearModal, setShowConfirmClearModal] = useState<boolean>(false);
-  const [isClearing, setIsClearing] = useState<boolean>(false);
-
   // Modal para anular pedido sin usar prompt()
   const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
   const [cancelReason, setCancelReason] = useState<string>('');
@@ -237,21 +233,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({ onNavigate }) => {
     }
   };
 
-  // Limpiar todos los datos de prueba y restablecer a Guadalajara de Buga limpio
-  const handleExecuteClearDemoData = async () => {
-    setIsClearing(true);
-    try {
-      await clearAllTransactionalRecords();
-      showToast('¡Datos de prueba eliminados! Sistema listo para operar con datos reales en Guadalajara de Buga.', 'success');
-      setShowConfirmClearModal(false);
-    } catch (err: any) {
-      console.error(err);
-      showToast(err.message || 'Error al limpiar registros', 'error');
-    } finally {
-      setIsClearing(false);
-    }
-  };
-
   // Botón WhatsApp directo para domicilios
   const handleOpenWhatsApp = (phone: string = '', customerName: string = '', orderNum: number, total: number) => {
     const cleanPhone = phone.replace(/[^0-9]/g, '');
@@ -323,18 +304,6 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({ onNavigate }) => {
                   <span>Cartera</span>
                 </button>
               </>
-            )}
-
-            {currentUser?.role === 'administrador' && (
-              <button
-                type="button"
-                onClick={() => setShowConfirmClearModal(true)}
-                className="px-3.5 py-2.5 rounded-xl bg-[#242424] hover:bg-red-950/60 border border-[#383838] hover:border-red-700/60 text-[#a8a29e] hover:text-red-300 text-xs font-bold inline-flex items-center gap-1.5 transition-colors cursor-pointer"
-                title="Limpiar registros de prueba para empezar con datos reales"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span className="hidden sm:inline">Limpiar Registros Demo</span>
-              </button>
             )}
           </div>
         </div>
@@ -797,45 +766,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({ onNavigate }) => {
         />
       )}
 
-      {/* MODAL 5: Confirmación de Limpieza de Registros Demo */}
-      {showConfirmClearModal && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#181818] border border-amber-600/60 rounded-3xl w-full max-w-md p-6 text-[#FFFDF5] shadow-2xl space-y-4">
-            <div className="w-12 h-12 rounded-2xl bg-amber-950/60 border border-amber-600 text-[#D6A21A] flex items-center justify-center mx-auto">
-              <Trash2 className="w-6 h-6" />
-            </div>
 
-            <div className="text-center space-y-2">
-              <h3 className="text-lg font-black text-[#FFFDF5]">
-                ¿Limpiar todos los registros demo?
-              </h3>
-              <p className="text-xs text-[#d6d3d1] leading-relaxed">
-                Esta acción eliminará todos los pedidos de prueba, turnos y movimientos de caja anteriores, liberará todas las mesas y dejará la sede única de <strong className="text-[#D6A21A]">Guadalajara de Buga</strong> en blanco, lista para registrar operaciones reales.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#2e2e2e]">
-              <button
-                type="button"
-                disabled={isClearing}
-                onClick={() => setShowConfirmClearModal(false)}
-                className="px-4 py-2.5 rounded-xl bg-[#242424] hover:bg-[#2e2e2e] text-xs font-bold text-[#a8a29e] cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={isClearing}
-                onClick={handleExecuteClearDemoData}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-red-700 to-red-600 hover:brightness-110 text-white font-black text-xs cursor-pointer shadow-lg inline-flex items-center gap-2"
-              >
-                {isClearing && <RefreshCw className="w-3.5 h-3.5 animate-spin" />}
-                <span>{isClearing ? 'Limpiando...' : 'Sí, Limpiar y Reiniciar Buga'}</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* MODAL 6: Anulación de Pedido */}
       {orderToCancel && (

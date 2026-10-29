@@ -12,7 +12,11 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-export const BranchConfigView: React.FC = () => {
+interface BranchConfigViewProps {
+  onNavigateToButtons?: () => void;
+}
+
+export const BranchConfigView: React.FC<BranchConfigViewProps> = ({ onNavigateToButtons }) => {
   const { branches, currentBranch, setCurrentBranchId } = useRestaurant();
 
   // Matriz de permisos configurables por rol
@@ -144,14 +148,26 @@ export const BranchConfigView: React.FC = () => {
 
       {/* 3. Matriz de Roles y Permisos de Personal */}
       <div className="bg-[#14131a] p-5 rounded-2xl border border-[#2d281e] shadow-xl">
-        <div className="flex items-center gap-2 pb-3 border-b border-[#2d281e] mb-4">
-          <ShieldCheck className="w-5 h-5 text-[#d4af37]" />
-          <div>
-            <h3 className="font-bold text-sm text-[#fef3c7]">Matriz de Roles y Permisos del Personal</h3>
-            <p className="text-xs text-[#a8a29e]">
-              Administrador, Cajero, Mesero, Cocina, Domiciliario y Supervisor.
-            </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-[#2d281e] mb-4 gap-3">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-[#d4af37]" />
+            <div>
+              <h3 className="font-bold text-sm text-[#fef3c7]">Matriz de Roles y Permisos del Personal</h3>
+              <p className="text-xs text-[#a8a29e]">
+                Administrador (Acceso total), Asesor (Operación) y Cocinero (Cocina KDS).
+              </p>
+            </div>
           </div>
+          {onNavigateToButtons && (
+            <button
+              type="button"
+              onClick={onNavigateToButtons}
+              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#B77900] to-[#D6A21A] text-[#181818] font-black text-xs flex items-center gap-2 hover:brightness-110 shadow-md cursor-pointer self-start sm:self-auto"
+            >
+              <Sliders className="w-4 h-4" />
+              <span>Configurar Botones y Roles</span>
+            </button>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

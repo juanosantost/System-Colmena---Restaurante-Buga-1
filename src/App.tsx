@@ -28,12 +28,15 @@ import { ReportsView } from './components/reports/ReportsView';
 import { PaymentMethodsManagementView } from './components/admin/PaymentMethodsManagementView';
 import { IncomesView } from './components/incomes/IncomesView';
 import { OtherIncomeRegistrationView } from './components/incomes/OtherIncomeRegistrationView';
+import { MenuButtonsConfigView } from './components/admin/MenuButtonsConfigView';
+import { MenuConfigProvider, useMenuConfig } from './context/MenuConfigContext';
 import { Supplier } from './types';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
 import { normalizeUserRole, canUserAccessModule } from './utils/auth';
 
 const MainAppContent: React.FC = () => {
   const { isAuthenticated, isLoading, currentUser } = useAuth();
+  const { canRoleAccessView } = useMenuConfig();
   const [currentView, setCurrentView] = useState<AppView>('home');
   const [selectedSupplierForPurchase, setSelectedSupplierForPurchase] = useState<Supplier | null>(null);
 
@@ -63,13 +66,13 @@ const MainAppContent: React.FC = () => {
     return <LoginView />;
   }
 
-  // Comprobar si el usuario tiene acceso a la vista seleccionada según los 3 roles:
-  // Administrador: Acceso total.
-  // Asesor: Acceso al apartado operación.
-  // Cocinero: Acceso únicamente a la parte de cocina.
+  // Comprobar si el usuario tiene acceso a la vista seleccionada según los 3 roles y la configuración dinámica del menú:
+  // Administrador: Acceso total (configurable).
+  // Asesor: Acceso a módulos autorizados (operación por defecto).
+  // Cocinero: Acceso únicamente a módulos autorizados (cocina por defecto).
   const isAuthorizedForView = (view: AppView): boolean => {
     if (!currentUser) return false;
-    return canUserAccessModule(currentUser.role, view);
+    return canRoleAccessView(currentUser.role, view);
   };
 
   const hasAccess = isAuthorizedForView(currentView);
@@ -170,7 +173,8 @@ const MainAppContent: React.FC = () => {
           {currentView === 'usuarios' && <UsersManagementView />}
           {currentView === 'sucursales' && <BranchesManagementView />}
           {currentView === 'config-mesas' && <RestaurantConfigView />}
-          {currentView === 'config' && <BranchConfigView />}
+          {currentView === 'config-botones' && <MenuButtonsConfigView />}
+          {currentView === 'config' && <BranchConfigView onNavigateToButtons={() => setCurrentView('config-botones')} />}
         </>
       )}
     </AppLayout>
@@ -182,7 +186,9 @@ export default function App() {
     <ToastProvider>
       <AuthProvider>
         <RestaurantProvider>
-          <MainAppContent />
+          <MenuConfigProvider>
+            <MainAppContent />
+          </MenuConfigProvider>
         </RestaurantProvider>
       </AuthProvider>
     </ToastProvider>

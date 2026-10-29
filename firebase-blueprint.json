@@ -32,6 +32,10 @@
         "role": { "type": "string", "enum": ["administrador", "supervisor", "cajero", "mesero", "cocina", "domiciliario"] },
         "authorizedBranchIds": { "type": "array" },
         "isActive": { "type": "boolean" },
+        "isDeleted": { "type": "boolean" },
+        "deletedAt": { "type": "string" },
+        "deletedBy": { "type": "string" },
+        "deleteReason": { "type": "string", "maxLength": 200 },
         "createdAt": { "type": "string" },
         "lastLoginAt": { "type": "string" },
         "phone": { "type": "string", "maxLength": 30 }
@@ -232,9 +236,25 @@
         "createdAt": { "type": "string" }
       },
       "required": ["id", "branchId", "orderId", "method", "total", "createdAt"]
+    },
+    "MenuConfig": {
+      "title": "MenuConfig",
+      "description": "Configuración de secciones, orden y permisos de roles para los botones de navegación",
+      "type": "object",
+      "properties": {
+        "sections": { "type": "array" },
+        "buttons": { "type": "array" },
+        "updatedAt": { "type": "string" },
+        "updatedBy": { "type": "string" }
+      },
+      "required": ["sections", "buttons"]
     }
   },
   "firestore": {
+    "/system_settings/{settingId}": {
+      "schema": { "$ref": "MenuConfig" },
+      "description": "Ajustes globales del sistema, incluyendo menú y botones"
+    },
     "/branches/{branchId}": {
       "schema": { "$ref": "Branch" },
       "description": "Sucursales registradas con NIT y recibos"
