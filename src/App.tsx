@@ -29,6 +29,7 @@ import { PaymentMethodsManagementView } from './components/admin/PaymentMethodsM
 import { IncomesView } from './components/incomes/IncomesView';
 import { OtherIncomeRegistrationView } from './components/incomes/OtherIncomeRegistrationView';
 import { MenuButtonsConfigView } from './components/admin/MenuButtonsConfigView';
+import { ManualView } from './components/manual/ManualView';
 import { MenuConfigProvider, useMenuConfig } from './context/MenuConfigContext';
 import { Supplier } from './types';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
@@ -71,6 +72,7 @@ const MainAppContent: React.FC = () => {
   // Asesor: Acceso a módulos autorizados (operación por defecto).
   // Cocinero: Acceso únicamente a módulos autorizados (cocina por defecto).
   const isAuthorizedForView = (view: AppView): boolean => {
+    if (view === 'manual') return true;
     if (!currentUser) return false;
     return canRoleAccessView(currentUser.role, view);
   };
@@ -175,6 +177,7 @@ const MainAppContent: React.FC = () => {
           {currentView === 'config-mesas' && <RestaurantConfigView />}
           {currentView === 'config-botones' && <MenuButtonsConfigView />}
           {currentView === 'config' && <BranchConfigView onNavigateToButtons={() => setCurrentView('config-botones')} />}
+          {currentView === 'manual' && <ManualView />}
         </>
       )}
     </AppLayout>

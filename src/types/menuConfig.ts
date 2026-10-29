@@ -283,6 +283,16 @@ export const DEFAULT_MENU_BUTTONS: MenuButtonItemConfig[] = [
     isVisible: true,
     description: 'Resumen legal y descriptivo de perfiles del sistema',
   },
+  {
+    id: 'manual',
+    label: 'Manual de Usuario',
+    iconName: 'BookOpen',
+    sectionId: 'administracion',
+    order: 7,
+    allowedRoles: ['administrador', 'asesor', 'cocinero'],
+    isVisible: true,
+    description: 'Guía paso a paso, ilustraciones y funcionamiento integral',
+  },
 ];
 
 export const DEFAULT_MENU_CONFIG: MenuConfig = {

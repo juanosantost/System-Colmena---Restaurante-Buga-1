@@ -36,10 +36,12 @@ import {
   Pin,
   PinOff,
   PanelLeft,
+  BookOpen,
 } from 'lucide-react';
 
 export type AppView =
   | 'home'
+  | 'manual'
   | 'mesas'
   | 'catalogo'
   | 'pedidos'
@@ -198,6 +200,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     Building2,
     Settings,
     Sliders,
+    BookOpen,
   };
 
   // Construir secciones visibles y ordenadas dinámicamente según configuración de administración y rol
@@ -340,8 +343,21 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
               </div>
             </div>
 
-            {/* Lado Derecho: Botón Cerrar Sesión */}
+            {/* Lado Derecho: Botón Manual y Cerrar Sesión */}
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onNavigate('manual')}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  currentView === 'manual'
+                    ? 'bg-[#2b2416] border-[#d4af37] text-[#fef3c7]'
+                    : 'bg-[#242424] hover:bg-[#2e2e2e] border-[#383838] text-[#e7e5e4] hover:border-[#d4af37]/60'
+                }`}
+                title="Manual de Usuario e Inducción Paso a Paso"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-[#D6A21A]" />
+                <span className="hidden sm:inline">Manual</span>
+              </button>
 
               <button
                 type="button"
@@ -525,8 +541,24 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                 ))}
               </div>
 
-              {/* Cerrar Sesión en pie del drawer */}
-              <div className="pt-3 border-t border-[#2e2e2e] mt-3">
+              {/* Manual y Cerrar Sesión en pie del drawer */}
+              <div className="pt-3 border-t border-[#2e2e2e] mt-3 space-y-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onNavigate('manual');
+                    if (!isNavPinned) setIsNavOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
+                    currentView === 'manual'
+                      ? 'bg-[#2b2416] text-[#fef3c7] border-[#d4af37]'
+                      : 'bg-[#242424] hover:bg-[#2e2e2e] text-[#d6d3d1] border-[#383838] hover:border-[#d4af37]/60'
+                  }`}
+                >
+                  <BookOpen className="w-4 h-4 text-[#D6A21A]" />
+                  <span>Manual de Usuario</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {
