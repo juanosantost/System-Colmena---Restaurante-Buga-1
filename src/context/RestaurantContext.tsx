@@ -506,22 +506,21 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   useEffect(() => {
     switch (userRole) {
       case 'administrador':
-        setStaffName('Juan Carlos Gómez (Admin)');
+        setStaffName('Administrador Colmena');
         break;
+      case 'asesor':
       case 'cajero':
-        setStaffName('Carolina Méndez (Cajero)');
-        break;
       case 'mesero':
-        setStaffName('Andrés Felipe Rueda (Mesero)');
-        break;
-      case 'cocina':
-        setStaffName('Mateo Zuluaga (Jefe de Cocina)');
-        break;
       case 'domiciliario':
-        setStaffName('Diego Pardo (Domicilios)');
-        break;
       case 'supervisor':
-        setStaffName('Valentina Restrepo (Supervisora)');
+        setStaffName('Asesor de Operación');
+        break;
+      case 'cocinero':
+      case 'cocina':
+        setStaffName('Cocinero');
+        break;
+      default:
+        setStaffName('Personal Colmena');
         break;
     }
   }, [userRole]);

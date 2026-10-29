@@ -3,7 +3,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { useToast } from '../../context/ToastContext';
 import { ColmenaUser, UserRole } from '../../types';
-import { validateDocumentNumber, validateEmail } from '../../utils/auth';
+import { validateDocumentNumber, validateEmail, normalizeUserRole } from '../../utils/auth';
 import { formatColombiaDateTime } from '../../utils/calculations';
 import {
   Users,
@@ -69,22 +69,19 @@ export const UsersManagementView: React.FC = () => {
   const [fullName, setFullName] = useState<string>('');
   const [documentNumber, setDocumentNumber] = useState<string>('');
   const [email, setEmail] = useState<string>('');
-  const [role, setRole] = useState<UserRole>('mesero');
+  const [role, setRole] = useState<UserRole>('asesor');
   const [authorizedBranchIds, setAuthorizedBranchIds] = useState<string[]>([]);
   const [phone, setPhone] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const rolesList: { id: UserRole; label: string }[] = [
-    { id: 'administrador', label: 'Administrador (Acceso total)' },
-    { id: 'supervisor', label: 'Supervisor' },
-    { id: 'cajero', label: 'Cajero' },
-    { id: 'mesero', label: 'Mesero' },
-    { id: 'cocina', label: 'Cocina' },
-    { id: 'domiciliario', label: 'Domiciliario' },
+  const rolesList: { id: UserRole; label: string; desc: string }[] = [
+    { id: 'administrador', label: 'Administrador (Acceso total)', desc: 'Acceso total a todos los módulos y opciones' },
+    { id: 'asesor', label: 'Asesor (Apartado operación)', desc: 'Acceso exclusivo al apartado operación' },
+    { id: 'cocinero', label: 'Cocinero (Únicamente cocina)', desc: 'Acceso únicamente a la parte de cocina' },
   ];
 
   const filteredUsers = allUsers.filter((u) => {
-    if (roleFilter !== 'todos' && u.role !== roleFilter) return false;
+    if (roleFilter !== 'todos' && normalizeUserRole(u.role) !== roleFilter) return false;
     if (branchFilter !== 'todos' && !u.authorizedBranchIds?.includes(branchFilter)) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -101,7 +98,7 @@ export const UsersManagementView: React.FC = () => {
     setFullName('');
     setDocumentNumber('');
     setEmail('');
-    setRole('mesero');
+    setRole('asesor');
     setAuthorizedBranchIds(branches.map((b) => b.id)); // Por defecto todas
     setPhone('');
     setIsModalOpen(true);
@@ -112,7 +109,7 @@ export const UsersManagementView: React.FC = () => {
     setFullName(u.fullName);
     setDocumentNumber(u.documentNumber);
     setEmail(u.email);
-    setRole(u.role);
+    setRole(normalizeUserRole(u.role));
     setAuthorizedBranchIds(u.authorizedBranchIds || []);
     setPhone(u.phone || '');
     setIsModalOpen(true);
@@ -197,20 +194,27 @@ export const UsersManagementView: React.FC = () => {
     }
   };
 
+  const getRoleLabel = (r: UserRole) => {
+    const norm = normalizeUserRole(r);
+    switch (norm) {
+      case 'administrador':
+        return 'Administrador';
+      case 'asesor':
+        return 'Asesor';
+      case 'cocinero':
+        return 'Cocinero';
+    }
+  };
+
   const getRoleBadge = (r: UserRole) => {
-    switch (r) {
+    const norm = normalizeUserRole(r);
+    switch (norm) {
       case 'administrador':
         return 'bg-[#292212] text-[#D6A21A] border border-[#B77900]';
-      case 'supervisor':
-        return 'bg-purple-950/80 text-purple-300 border border-purple-800';
-      case 'cajero':
-        return 'bg-cyan-950/80 text-cyan-300 border border-cyan-800';
-      case 'mesero':
-        return 'bg-amber-950/80 text-amber-300 border border-amber-800';
-      case 'cocina':
-        return 'bg-emerald-950/80 text-emerald-300 border border-emerald-800';
-      case 'domiciliario':
+      case 'asesor':
         return 'bg-blue-950/80 text-blue-300 border border-blue-800';
+      case 'cocinero':
+        return 'bg-emerald-950/80 text-emerald-300 border border-emerald-800';
     }
   };
 
@@ -228,9 +232,6 @@ export const UsersManagementView: React.FC = () => {
               <h2 className="text-lg font-black text-[#FFFDF5]">
                 Administración de Usuarios y Personal
               </h2>
-              <span className="text-[10px] uppercase font-black px-2 py-0.5 rounded-full bg-[#B77900] text-[#181818]">
-                Módulo 01
-              </span>
             </div>
             <p className="text-xs text-[#a8a29e] mt-0.5">
               Control de roles, números de documento y asignación de sucursales autorizadas.
@@ -348,12 +349,12 @@ export const UsersManagementView: React.FC = () => {
                       </td>
                       <td className="p-3.5">
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${roleBadge}`}>
-                          {user.role}
+                          {getRoleLabel(user.role)}
                         </span>
                       </td>
                       <td className="p-3.5">
                         <div className="flex flex-wrap gap-1 max-w-xs">
-                          {user.role === 'administrador' ? (
+                          {normalizeUserRole(user.role) === 'administrador' ? (
                             <span className="px-1.5 py-0.5 rounded bg-[#292212] text-[#D6A21A] text-[10px] font-bold border border-[#B77900]/40">
                               Todas las Sucursales
                             </span>
@@ -533,6 +534,9 @@ export const UsersManagementView: React.FC = () => {
                     </option>
                   ))}
                 </select>
+                <p className="text-[11px] text-[#D6A21A] mt-1.5 font-medium">
+                  {rolesList.find((r) => r.id === role)?.desc}
+                </p>
               </div>
 
               {/* Selección de Sucursales Autorizadas */}

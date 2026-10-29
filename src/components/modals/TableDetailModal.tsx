@@ -46,7 +46,7 @@ export const TableDetailModal: React.FC<TableDetailModalProps> = ({
   const [selectedStatus, setSelectedStatus] = useState<TableStatus>(table.status);
   const [partySize, setPartySize] = useState<number>(table.partySize || table.capacity || 2);
   const [assignedWaiterName, setAssignedWaiterName] = useState<string>(
-    table.assignedWaiterName || (userRole === 'mesero' ? staffName : '')
+    table.assignedWaiterName || (userRole === 'asesor' || userRole === 'mesero' ? staffName : '')
   );
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [validationError, setValidationError] = useState<string | null>(null);

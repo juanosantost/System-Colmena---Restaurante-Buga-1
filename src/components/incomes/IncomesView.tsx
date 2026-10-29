@@ -73,11 +73,11 @@ export const IncomesView: React.FC<IncomesViewProps> = ({ onNavigateToView }) =>
   const { currentUser } = useAuth();
   const { showToast } = useToast();
 
-  const isAdminOrSupervisor = currentUser?.role === 'administrador' || currentUser?.role === 'supervisor';
+  const isAdmin = currentUser?.role === 'administrador';
 
   // Configuración de Fechas por defecto en Colombia
   const todayStr = new Date().toISOString().split('T')[0];
-  const [startDate, setStartDate] = useState<string>(isAdminOrSupervisor ? `${todayStr.substring(0, 8)}01` : todayStr);
+  const [startDate, setStartDate] = useState<string>(isAdmin ? `${todayStr.substring(0, 8)}01` : todayStr);
   const [endDate, setEndDate] = useState<string>(todayStr);
 
   // Filtros adicionales
@@ -395,7 +395,7 @@ export const IncomesView: React.FC<IncomesViewProps> = ({ onNavigateToView }) =>
               <input
                 type="date"
                 value={startDate}
-                disabled={!isAdminOrSupervisor}
+                disabled={!isAdmin}
                 onChange={(e) => {
                   setStartDate(e.target.value);
                   setCurrentPage(1);
@@ -410,7 +410,7 @@ export const IncomesView: React.FC<IncomesViewProps> = ({ onNavigateToView }) =>
               <input
                 type="date"
                 value={endDate}
-                disabled={!isAdminOrSupervisor}
+                disabled={!isAdmin}
                 onChange={(e) => {
                   setEndDate(e.target.value);
                   setCurrentPage(1);
@@ -427,7 +427,7 @@ export const IncomesView: React.FC<IncomesViewProps> = ({ onNavigateToView }) =>
               Consultar
             </button>
 
-            {!isAdminOrSupervisor && (
+            {!isAdmin && (
               <span className="text-[10px] text-[#78716c] flex items-center gap-1">
                 <Info className="w-3.5 h-3.5 text-amber-500" />
                 Consulta del día actual para rol Asesor.
@@ -684,8 +684,8 @@ export const IncomesView: React.FC<IncomesViewProps> = ({ onNavigateToView }) =>
                                 </button>
                               )}
 
-                              {/* Editar (autorizado para admin/supervisor o asesor según tipo) */}
-                              {row.status === 'activo' && isAdminOrSupervisor && (
+                              {/* Editar (autorizado para admin) */}
+                              {row.status === 'activo' && isAdmin && (
                                 <button
                                   type="button"
                                   onClick={() => {
@@ -700,7 +700,7 @@ export const IncomesView: React.FC<IncomesViewProps> = ({ onNavigateToView }) =>
                               )}
 
                               {/* Anular individualmente */}
-                              {row.status === 'activo' && isAdminOrSupervisor && (
+                              {row.status === 'activo' && isAdmin && (
                                 <button
                                   type="button"
                                   onClick={() => {

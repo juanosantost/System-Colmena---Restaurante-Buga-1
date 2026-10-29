@@ -30,11 +30,24 @@ import { IncomesView } from './components/incomes/IncomesView';
 import { OtherIncomeRegistrationView } from './components/incomes/OtherIncomeRegistrationView';
 import { Supplier } from './types';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
+import { normalizeUserRole, canUserAccessModule } from './utils/auth';
 
 const MainAppContent: React.FC = () => {
-  const { isAuthenticated, isLoading, currentUser, canAccess } = useAuth();
+  const { isAuthenticated, isLoading, currentUser } = useAuth();
   const [currentView, setCurrentView] = useState<AppView>('home');
   const [selectedSupplierForPurchase, setSelectedSupplierForPurchase] = useState<Supplier | null>(null);
+
+  // Redirección inteligente al iniciar sesión según rol operativo
+  React.useEffect(() => {
+    if (currentUser) {
+      const normRole = normalizeUserRole(currentUser.role);
+      if (normRole === 'cocinero') {
+        setCurrentView('cocina');
+      } else if (normRole === 'asesor' && !canUserAccessModule('asesor', currentView)) {
+        setCurrentView('home');
+      }
+    }
+  }, [currentUser]);
 
   if (isLoading) {
     return (
@@ -50,33 +63,13 @@ const MainAppContent: React.FC = () => {
     return <LoginView />;
   }
 
-  // Comprobar si el usuario tiene acceso a la vista seleccionada
+  // Comprobar si el usuario tiene acceso a la vista seleccionada según los 3 roles:
+  // Administrador: Acceso total.
+  // Asesor: Acceso al apartado operación.
+  // Cocinero: Acceso únicamente a la parte de cocina.
   const isAuthorizedForView = (view: AppView): boolean => {
-    if (
-      view === 'home' ||
-      view === 'config' ||
-      view === 'config-mesas' ||
-      view === 'medios-pago' ||
-      view === 'catalogo' ||
-      view === 'domicilios' ||
-      view === 'clientes' ||
-      view === 'separados' ||
-      view === 'cartera' ||
-      view === 'reportes' ||
-      view === 'compras' ||
-      view === 'proveedores' ||
-      view === 'cuentas-por-pagar' ||
-      view === 'anticipos-proveedores' ||
-      view === 'desembolsos' ||
-      view === 'registrar-gasto' ||
-      view === 'registrar-compra' ||
-      view === 'ingresos' ||
-      view === 'otros-ingresos'
-    )
-      return true;
-    if (currentUser.role === 'administrador' || currentUser.role === 'supervisor') return true;
-    if (view === 'usuarios' || view === 'sucursales') return false; // Solo Administrador
-    return canAccess(view);
+    if (!currentUser) return false;
+    return canUserAccessModule(currentUser.role, view);
   };
 
   const hasAccess = isAuthorizedForView(currentView);
@@ -92,15 +85,15 @@ const MainAppContent: React.FC = () => {
             Módulo Restringido por Rol
           </h2>
           <p className="text-xs text-[#d6d3d1] mb-6 leading-relaxed">
-            Tu rol actual de <strong className="capitalize text-[#D6A21A]">{currentUser.role}</strong> no cuenta con los permisos necesarios para acceder a este módulo. Si requieres autorización, solicita la habilitación a un Administrador del Sistema Colmena.
+            Tu rol actual de <strong className="capitalize text-[#D6A21A]">{normalizeUserRole(currentUser.role)}</strong> no cuenta con los permisos necesarios para acceder a este módulo. Si requieres autorización, solicita la habilitación a un Administrador del Sistema Colmena.
           </p>
           <button
             type="button"
-            onClick={() => setCurrentView('home')}
+            onClick={() => setCurrentView(normalizeUserRole(currentUser.role) === 'cocinero' ? 'cocina' : 'home')}
             className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#B77900] to-[#D6A21A] text-[#181818] font-black text-xs inline-flex items-center gap-2 hover:brightness-110 shadow-lg cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Volver al Tablero Principal</span>
+            <span>Volver a {normalizeUserRole(currentUser.role) === 'cocinero' ? 'Cocina' : 'Operación'}</span>
           </button>
         </div>
       ) : (

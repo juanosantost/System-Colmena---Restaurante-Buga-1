@@ -12,29 +12,52 @@ export function canUserAccessBranch(user: ColmenaUser | null | undefined, branch
 }
 
 /**
- * Matriz de acceso a módulos según rol operativo.
+ * Normaliza cualquier rol a los 3 roles oficiales del Sistema Colmena:
+ * - 'administrador': Acceso total.
+ * - 'asesor': Acceso al apartado operación.
+ * - 'cocinero': Acceso únicamente a la parte de cocina.
  */
-export const MODULE_PERMISSIONS: Record<string, UserRole[]> = {
-  home: ['administrador', 'supervisor', 'cajero', 'mesero', 'cocina', 'domiciliario'],
-  mesas: ['administrador', 'supervisor', 'cajero', 'mesero'],
-  pedidos: ['administrador', 'supervisor', 'cajero', 'mesero', 'domiciliario'],
-  cocina: ['administrador', 'supervisor', 'cocina'],
-  caja: ['administrador', 'supervisor', 'cajero'],
-  inventario: ['administrador', 'supervisor', 'cocina'],
-  usuarios: ['administrador'],
-  sucursales: ['administrador'],
-  compras: ['administrador', 'supervisor'],
-  domicilios: ['administrador', 'supervisor', 'domiciliario', 'cajero'],
-  clientes: ['administrador', 'supervisor', 'cajero'],
-  reportes: ['administrador', 'supervisor'],
-};
+export function normalizeUserRole(role: string | undefined): 'administrador' | 'asesor' | 'cocinero' {
+  if (!role) return 'asesor';
+  const r = role.toLowerCase().trim();
+  if (r === 'administrador') return 'administrador';
+  if (r === 'cocinero' || r === 'cocina') return 'cocinero';
+  return 'asesor';
+}
 
-export function canUserAccessModule(role: UserRole | undefined, moduleName: string): boolean {
+/**
+ * Vistas y submódulos que pertenecen al apartado OPERACIÓN.
+ */
+export const OPERACION_VIEWS = [
+  'home',
+  'pedidos',
+  'mesas',
+  'cocina',
+  'domicilios',
+  'caja',
+  'ingresos',
+  'otros-ingresos',
+];
+
+/**
+ * Matriz de acceso estricta para los 3 roles:
+ * - Administrador: Acceso total a todos los módulos y opciones.
+ * - Asesor: Acceso al apartado OPERACIÓN (inicio, pedidos, mesas, cocina, domicilios, caja, ingresos).
+ * - Cocinero: Acceso únicamente a la parte de cocina.
+ */
+export function canUserAccessModule(role: UserRole | string | undefined, moduleName: string): boolean {
   if (!role) return false;
-  if (role === 'administrador') return true;
-  const allowed = MODULE_PERMISSIONS[moduleName];
-  if (!allowed) return false;
-  return allowed.includes(role);
+  const normRole = normalizeUserRole(role);
+  if (normRole === 'administrador') {
+    return true;
+  }
+  if (normRole === 'cocinero') {
+    return moduleName === 'cocina';
+  }
+  if (normRole === 'asesor') {
+    return OPERACION_VIEWS.includes(moduleName);
+  }
+  return false;
 }
 
 /**

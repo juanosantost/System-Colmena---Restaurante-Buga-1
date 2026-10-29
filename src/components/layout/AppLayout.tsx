@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { useToast } from '../../context/ToastContext';
+import { normalizeUserRole } from '../../utils/auth';
 import {
   LayoutGrid,
   ClipboardList,
@@ -31,6 +32,9 @@ import {
   BookmarkCheck,
   CreditCard,
   TrendingUp,
+  Pin,
+  PinOff,
+  PanelLeft,
 } from 'lucide-react';
 
 export type AppView =
@@ -84,10 +88,42 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   const { tables, activeOrders, activeComandas, inventory, activeShift } = useRestaurant();
   const { showToast } = useToast();
 
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+  // Estado para la navbar: oculta para aprovechar el 100% de la pantalla en escritorio y móvil
+  const [isNavOpen, setIsNavOpen] = useState<boolean>(false);
+  const [isNavPinned, setIsNavPinned] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('colmena_nav_pinned') === 'true';
+    } catch {
+      return false;
+    }
+  });
   const [colombiaTime, setColombiaTime] = useState<string>('');
   const [showProfileMenu, setShowProfileMenu] = useState<boolean>(false);
+
+  const togglePinNav = () => {
+    const next = !isNavPinned;
+    setIsNavPinned(next);
+    try {
+      localStorage.setItem('colmena_nav_pinned', String(next));
+    } catch {}
+    if (next) {
+      setIsNavOpen(true);
+      showToast('Menú lateral fijado en pantalla', 'info');
+    } else {
+      showToast('Menú configurado para auto-ocultarse al seleccionar opciones', 'info');
+    }
+  };
+
+  // Atajo de teclado: Escape cierra la navbar si está abierta como overlay
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isNavOpen && !isNavPinned) {
+        setIsNavOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isNavOpen, isNavPinned]);
 
   // Reloj oficial de Colombia (America/Bogota, UTC-5)
   useEffect(() => {
@@ -161,7 +197,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         { id: 'pedidos', label: 'Pedidos Comercial', icon: ClipboardList, badge: activeOrders.length > 0 ? activeOrders.length : undefined, badgeColor: 'bg-[#292212] text-[#D6A21A] border border-[#B77900]/40', moduleKey: 'pedidos' },
         { id: 'mesas', label: 'Mesas & Salón', icon: LayoutGrid, badge: occupiedTables > 0 ? `${occupiedTables}/${tables.length}` : undefined, badgeColor: 'bg-[#B77900] text-[#181818]', moduleKey: 'mesas' },
         { id: 'cocina', label: 'Cocina (KDS)', icon: Flame, badge: pendingComandas > 0 ? pendingComandas : undefined, badgeColor: 'bg-amber-600 text-white animate-pulse', moduleKey: 'cocina' },
-        { id: 'domicilios', label: 'Domicilios & Llevar', icon: Bike, badge: 'Módulo 08', badgeColor: 'bg-[#B77900] text-[#181818]', moduleKey: 'domicilios' },
+        { id: 'domicilios', label: 'Domicilios & Llevar', icon: Bike, moduleKey: 'domicilios' },
         { id: 'caja', label: 'Caja & Movimientos', icon: Receipt, moduleKey: 'caja' },
         { id: 'ingresos', label: 'Ingresos', icon: TrendingUp, moduleKey: 'caja' },
       ],
@@ -169,7 +205,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     {
       sectionTitle: 'PRODUCTOS E INVENTARIO',
       items: [
-        { id: 'catalogo', label: 'Menú & Productos', icon: UtensilsCrossed, badge: 'Módulo 03', badgeColor: 'bg-[#B77900] text-[#181818]', moduleKey: 'catalogo' },
+        { id: 'catalogo', label: 'Menú & Productos', icon: UtensilsCrossed, moduleKey: 'catalogo' },
         { id: 'inventario', label: 'Ingredientes e Inventario', icon: Boxes, badge: lowStockItems > 0 ? `! ${lowStockItems}` : undefined, badgeColor: 'bg-red-900/80 text-red-200 border border-red-700/50', moduleKey: 'inventario' },
       ],
     },
@@ -185,7 +221,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     {
       sectionTitle: 'GESTIÓN COMERCIAL',
       items: [
-        { id: 'clientes', label: 'Clientes & CRM', icon: Users, badge: 'Módulo 12', badgeColor: 'bg-[#B77900] text-[#181818]', moduleKey: 'clientes' },
+        { id: 'clientes', label: 'Clientes & CRM', icon: Users, moduleKey: 'clientes' },
         { id: 'separados', label: 'Separados & Reservas', icon: BookmarkCheck, badge: 'Layaway', badgeColor: 'bg-[#B77900] text-[#181818]', moduleKey: 'separados' },
         { id: 'cartera', label: 'Cartera & Cobros', icon: CreditCard, badge: 'Créditos', badgeColor: 'bg-[#B77900] text-[#181818]', moduleKey: 'cartera' },
       ],
@@ -193,11 +229,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     {
       sectionTitle: 'ADMINISTRACIÓN',
       items: [
-        { id: 'reportes', label: 'Informes & Estadísticas', icon: BarChart3, badge: 'Módulo 13', badgeColor: 'bg-[#B77900] text-[#181818]', moduleKey: 'reportes' },
+        { id: 'reportes', label: 'Informes & Estadísticas', icon: BarChart3, moduleKey: 'reportes' },
         { id: 'medios-pago', label: 'Medios de Pago', icon: CreditCard, requiresAdmin: false, moduleKey: 'caja' },
         { id: 'usuarios', label: 'Usuarios & Personal', icon: Users, requiresAdmin: true, moduleKey: 'usuarios' },
         { id: 'sucursales', label: 'Sucursales & Facturación', icon: Building2, requiresAdmin: true, moduleKey: 'sucursales' },
-        { id: 'config-mesas', label: 'Config. Salones & Mesas', icon: Settings, badge: 'Módulo 02', badgeColor: 'bg-[#B77900] text-[#181818]', requiresAdmin: false, moduleKey: 'config-mesas' },
+        { id: 'config-mesas', label: 'Config. Salones & Mesas', icon: Settings, requiresAdmin: false, moduleKey: 'config-mesas' },
         { id: 'config', label: 'Matriz de Permisos', icon: Sliders, moduleKey: 'config' },
       ],
     },
@@ -207,45 +243,44 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     .map((sec) => ({
       ...sec,
       items: sec.items.filter((item) => {
-        if (
-          item.id === 'home' ||
-          item.id === 'config' ||
-          item.id === 'config-mesas' ||
-          item.id === 'medios-pago' ||
-          item.id === 'catalogo' ||
-          item.id === 'domicilios' ||
-          item.id === 'clientes' ||
-          item.id === 'separados' ||
-          item.id === 'cartera' ||
-          item.id === 'ingresos' ||
-          item.id === 'otros-ingresos' ||
-          item.id === 'desembolsos' ||
-          item.id === 'proveedores' ||
-          item.id === 'cuentas-por-pagar' ||
-          item.id === 'anticipos-proveedores'
-        )
-          return true;
-        if (currentUser?.role === 'administrador' || currentUser?.role === 'supervisor') return true;
-        if (item.requiresAdmin) return false;
-        return canAccess(item.moduleKey);
+        const normRole = normalizeUserRole(currentUser?.role);
+        if (normRole === 'administrador') return true;
+        if (normRole === 'cocinero') {
+          // Cocinero: Acceso únicamente a la parte de cocina
+          return item.id === 'cocina';
+        }
+        if (normRole === 'asesor') {
+          // Asesor: Acceso al apartado operación
+          return sec.sectionTitle === 'OPERACIÓN';
+        }
+        return false;
       }),
     }))
     .filter((sec) => sec.items.length > 0);
 
+  const getRoleDisplayName = (role: string = '') => {
+    const norm = normalizeUserRole(role);
+    switch (norm) {
+      case 'administrador':
+        return 'Administrador';
+      case 'asesor':
+        return 'Asesor';
+      case 'cocinero':
+        return 'Cocinero';
+      default:
+        return 'Personal';
+    }
+  };
+
   const getRoleBadgeColor = (role: string = '') => {
-    switch (role) {
+    const norm = normalizeUserRole(role);
+    switch (norm) {
       case 'administrador':
         return 'bg-[#292212] text-[#D6A21A] border-[#B77900]';
-      case 'supervisor':
-        return 'bg-purple-950 text-purple-300 border-purple-800';
-      case 'cajero':
-        return 'bg-cyan-950 text-cyan-300 border-cyan-800';
-      case 'mesero':
-        return 'bg-amber-950 text-amber-300 border-amber-800';
-      case 'cocina':
-        return 'bg-emerald-950 text-emerald-300 border-emerald-800';
-      case 'domiciliario':
+      case 'asesor':
         return 'bg-blue-950 text-blue-300 border-blue-800';
+      case 'cocinero':
+        return 'bg-emerald-950 text-emerald-300 border-emerald-800';
       default:
         return 'bg-[#242424] text-[#a8a29e] border-[#383838]';
     }
@@ -263,11 +298,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="lg:hidden p-2 rounded-xl bg-[#242424] text-[#D6A21A] hover:bg-[#2d2d2d] border border-[#383838]"
-                aria-label="Abrir menú"
+                onClick={() => setIsNavOpen(!isNavOpen)}
+                className="px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-[#242424] hover:bg-[#2d2d2d] text-[#D6A21A] hover:text-[#FFFDF5] border border-[#383838] flex items-center gap-2 cursor-pointer shadow-sm transition-all focus:outline-none"
+                aria-label={isNavOpen ? 'Ocultar menú' : 'Abrir menú'}
+                title={isNavOpen ? 'Ocultar menú lateral (Pantalla completa)' : 'Desplegar menú lateral'}
               >
-                {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                {isNavOpen ? <X className="w-5 h-5 text-amber-400" /> : <Menu className="w-5 h-5" />}
+                <span className="text-xs font-bold hidden sm:inline">
+                  {isNavOpen ? 'Ocultar Menú' : 'Menú'}
+                </span>
               </button>
 
               <div
@@ -337,110 +376,113 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
         </div>
       </header>
 
-      {/* 2. Cuerpo Principal: Sidebar Plegable en Desktop + Contenido Central */}
+      {/* 2. Cuerpo Principal: Navbar Ocultable + Contenido Central a Pantalla Completa */}
       <div className="flex-1 flex w-full relative">
-        
-        {/* Barra Lateral Plegable para Desktop */}
-        <aside
-          className={`hidden lg:flex flex-col bg-[#181818] border-r border-[#333333] transition-all duration-300 z-30 sticky top-20 h-[calc(100vh-5rem)] ${
-            isSidebarCollapsed ? 'w-20' : 'w-64'
-          }`}
-        >
-          {/* Navegación Vertical con Grupos Solicitados */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-3 no-scrollbar">
-            {visibleSections.map((sec) => (
-              <div key={sec.sectionTitle} className="space-y-1">
-                {!isSidebarCollapsed ? (
+
+        {/* Barra Lateral Fijada (cuando el usuario decide anclarla en escritorio) */}
+        {isNavPinned && (
+          <aside className="hidden lg:flex flex-col w-64 shrink-0 bg-[#181818] border-r border-[#333333] sticky top-20 h-[calc(100vh-5rem)] z-30 transition-all">
+            <div className="p-3 border-b border-[#2e2e2e] flex items-center justify-between text-xs">
+              <span className="text-[10px] uppercase font-bold text-[#D6A21A] flex items-center gap-1.5">
+                <PanelLeft className="w-3.5 h-3.5" />
+                <span>Navegación Fija</span>
+              </span>
+              <button
+                type="button"
+                onClick={togglePinNav}
+                className="p-1.5 rounded-lg bg-[#242424] hover:bg-[#2d2d2d] text-[#a8a29e] hover:text-[#D6A21A] border border-[#383838] transition-colors cursor-pointer"
+                title="Desfijar para auto-ocultar menú y aprovechar toda la pantalla"
+              >
+                <PinOff className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 space-y-3 no-scrollbar">
+              {visibleSections.map((sec) => (
+                <div key={sec.sectionTitle} className="space-y-1">
                   <div className="px-2 pt-2 pb-1 text-[10px] font-black uppercase tracking-wider text-[#D6A21A]/80 border-b border-[#292212]">
                     {sec.sectionTitle}
                   </div>
-                ) : (
-                  <div className="my-1 border-t border-[#292212]" />
-                )}
-                {sec.items.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = currentView === item.id;
-
-                  return (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => onNavigate(item.id)}
-                      className={`w-full flex items-center gap-3 p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer group ${
-                        isActive
-                          ? 'bg-gradient-to-r from-[#B77900] to-[#D6A21A] text-[#181818] shadow-md shadow-[#B77900]/20'
-                          : 'text-[#d6d3d1] hover:text-[#FFFDF5] hover:bg-[#242424]'
-                      }`}
-                      title={item.label}
-                    >
-                      <Icon
-                        className={`w-4 h-4 shrink-0 transition-transform group-hover:scale-110 ${
-                          isActive ? 'text-[#181818]' : 'text-[#D6A21A]'
+                  {sec.items.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = currentView === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => onNavigate(item.id)}
+                        className={`w-full flex items-center gap-3 p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer group ${
+                          isActive
+                            ? 'bg-gradient-to-r from-[#B77900] to-[#D6A21A] text-[#181818] shadow-md shadow-[#B77900]/20'
+                            : 'text-[#d6d3d1] hover:text-[#FFFDF5] hover:bg-[#242424]'
                         }`}
-                      />
-                      {!isSidebarCollapsed && (
+                        title={item.label}
+                      >
+                        <Icon className={`w-4 h-4 shrink-0 transition-transform group-hover:scale-110 ${isActive ? 'text-[#181818]' : 'text-[#D6A21A]'}`} />
                         <span className="flex-1 text-left truncate">{item.label}</span>
-                      )}
-                      {!isSidebarCollapsed && item.badge && (
-                        <span
-                          className={`text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 ${
-                            item.badgeColor || 'bg-[#292212] text-[#D6A21A]'
-                          }`}
-                        >
-                          {item.badge}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
+                        {item.badge && (
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 ${item.badgeColor || 'bg-[#292212] text-[#D6A21A]'}`}>
+                            {item.badge}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          </aside>
+        )}
 
-          {/* Botón Plegar / Desplegar Sidebar */}
-          <div className="p-3 border-t border-[#2e2e2e] flex items-center justify-between text-xs text-[#a8a29e]">
-            {!isSidebarCollapsed && (
-              <span className="text-[10px] uppercase font-bold text-[#78716c]">
-                Colapsar Menú
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className="p-2 rounded-xl bg-[#242424] hover:bg-[#2f2f2f] text-[#D6A21A] border border-[#383838] transition-colors ml-auto"
-              title={isSidebarCollapsed ? 'Expandir barra' : 'Plegar barra'}
-            >
-              {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-            </button>
-          </div>
-        </aside>
-
-        {/* Drawer de Navegación Adaptable para Dispositivos Móviles */}
-        {isMobileMenuOpen && (
-          <div className="fixed inset-0 z-50 lg:hidden flex">
-            {/* Backdrop */}
+        {/* Navbar Desplegable Flotante (Escritorio y Móvil): Se abre con el botón Menú y se oculta automáticamente al seleccionar cualquier opción */}
+        {isNavOpen && !isNavPinned && (
+          <div className="fixed inset-0 z-50 flex">
+            {/* Backdrop oscuro translúcido */}
             <div
-              className="fixed inset-0 bg-black/80 backdrop-blur-sm"
-              onClick={() => setIsMobileMenuOpen(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
+              onClick={() => setIsNavOpen(false)}
             />
 
-            {/* Panel Lateral Desplegable */}
-            <div className="relative w-72 max-w-[80vw] bg-[#181818] border-r border-[#B77900] text-[#FFFDF5] flex flex-col p-4 shadow-2xl z-10">
-              <div className="flex items-center justify-between pb-3 border-b border-[#2e2e2e] mb-4">
+            {/* Panel Lateral Flotante */}
+            <div className="relative w-72 sm:w-80 max-w-[85vw] bg-[#181818] border-r border-[#B77900]/60 text-[#FFFDF5] flex flex-col p-4 shadow-2xl z-10 animate-in slide-in-from-left duration-200">
+              {/* Encabezado del Menú */}
+              <div className="flex items-center justify-between pb-3 border-b border-[#2e2e2e] mb-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-[#D6A21A] font-black text-xl">⬡</span>
-                  <span className="font-black text-base text-[#FFFDF5]">COLMENA POS</span>
+                  <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#B77900] to-[#D6A21A] flex items-center justify-center text-[#181818] font-black shadow">
+                    ⬡
+                  </div>
+                  <div>
+                    <span className="font-black text-sm text-[#FFFDF5] block leading-tight">COLMENA RESTAURANTE</span>
+                    <span className="text-[10px] text-[#D6A21A] font-bold block">Menú del Sistema</span>
+                  </div>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-1 rounded-lg text-[#a8a29e] hover:text-[#FFFDF5]"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-1">
+                  {/* Botón para fijar menú en pantalla (opcional) */}
+                  <button
+                    type="button"
+                    onClick={togglePinNav}
+                    className="p-1.5 rounded-xl bg-[#242424] hover:bg-[#2d2d2d] text-[#a8a29e] hover:text-[#D6A21A] border border-[#383838] transition-colors cursor-pointer"
+                    title="Fijar menú permanente en pantalla"
+                  >
+                    <Pin className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsNavOpen(false)}
+                    className="p-1.5 rounded-xl bg-[#242424] hover:bg-[#2d2d2d] text-[#a8a29e] hover:text-[#FFFDF5] border border-[#383838] transition-colors cursor-pointer"
+                    title="Cerrar menú (Escape)"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-3">
+              {/* Mensaje informativo */}
+              <div className="px-3 py-1.5 rounded-xl bg-[#242424]/90 border border-[#383838] mb-3 text-[11px] text-[#D6A21A] flex items-center justify-between">
+                <span>Al seleccionar una opción el menú se oculta automáticamente.</span>
+              </div>
+
+              {/* Lista de Secciones y Opciones */}
+              <div className="flex-1 overflow-y-auto space-y-3 pr-1">
                 {visibleSections.map((sec) => (
                   <div key={sec.sectionTitle} className="space-y-1">
                     <div className="px-2 pt-2 pb-1 text-[10px] font-black uppercase tracking-wider text-[#D6A21A]/80 border-b border-[#292212]">
@@ -456,23 +498,26 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                           type="button"
                           onClick={() => {
                             onNavigate(item.id);
-                            setIsMobileMenuOpen(false);
+                            // Al seleccionar algo, ocultar la navbar automáticamente para aprovechar mejor el tamaño de la pantalla
+                            if (!isNavPinned) {
+                              setIsNavOpen(false);
+                            }
                           }}
-                          className={`w-full flex items-center gap-3 p-2.5 rounded-xl text-xs font-bold transition-all text-left ${
+                          className={`w-full flex items-center gap-3 p-2.5 rounded-xl text-xs font-bold transition-all text-left cursor-pointer ${
                             isActive
-                              ? 'bg-gradient-to-r from-[#B77900] to-[#D6A21A] text-[#181818]'
-                              : 'text-[#d6d3d1] hover:bg-[#242424]'
+                              ? 'bg-gradient-to-r from-[#B77900] to-[#D6A21A] text-[#181818] shadow-md shadow-[#B77900]/20'
+                              : 'text-[#d6d3d1] hover:text-[#FFFDF5] hover:bg-[#242424]'
                           }`}
                         >
                           <Icon
-                            className={`w-4 h-4 shrink-0 ${
+                            className={`w-4 h-4 shrink-0 transition-transform ${
                               isActive ? 'text-[#181818]' : 'text-[#D6A21A]'
                             }`}
                           />
-                          <span className="flex-1">{item.label}</span>
+                          <span className="flex-1 truncate">{item.label}</span>
                           {item.badge && (
                             <span
-                              className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                              className={`text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 ${
                                 item.badgeColor || 'bg-[#292212] text-[#D6A21A]'
                               }`}
                             >
@@ -486,14 +531,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                 ))}
               </div>
 
-              <div className="pt-4 border-t border-[#2e2e2e] mt-4">
+              {/* Cerrar Sesión en pie del drawer */}
+              <div className="pt-3 border-t border-[#2e2e2e] mt-3">
                 <button
                   type="button"
                   onClick={() => {
-                    setIsMobileMenuOpen(false);
+                    setIsNavOpen(false);
                     handleLogout();
                   }}
-                  className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl bg-red-950/40 text-red-400 border border-red-800 text-xs font-bold"
+                  className="w-full flex items-center justify-center gap-2 p-2.5 rounded-xl bg-red-950/40 hover:bg-red-950/70 text-red-300 border border-red-800 text-xs font-bold cursor-pointer transition-colors"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Cerrar Sesión</span>
@@ -503,8 +549,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
           </div>
         )}
 
-        {/* Área Principal de Contenido (Fondo Crema Colmena #FFFDF5) */}
-        <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-4">
+        {/* Área Principal de Contenido (Aprovechamiento máximo de pantalla) */}
+        <main className="flex-1 max-w-[1600px] w-full mx-auto p-3 sm:p-5 lg:p-6 space-y-4">
           
           {/* Barra Superior de Estado, Reloj y Perfil de Usuario (Ubicada fuera del Header) */}
           <div className="bg-[#181818] border border-[#333333] text-[#FFFDF5] rounded-2xl p-3 sm:px-4 sm:py-3 flex flex-wrap items-center justify-between gap-3 shadow-md">
@@ -520,7 +566,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                     {currentUser?.fullName || 'Usuario'}
                   </span>
                   <span className={`text-[9px] uppercase font-black px-2 py-0.5 rounded-full border ${getRoleBadgeColor(currentUser?.role)}`}>
-                    {currentUser?.role || 'Staff'}
+                    {getRoleDisplayName(currentUser?.role)}
                   </span>
                 </div>
                 <p className="text-[11px] text-[#a8a29e] flex items-center gap-2 font-mono">

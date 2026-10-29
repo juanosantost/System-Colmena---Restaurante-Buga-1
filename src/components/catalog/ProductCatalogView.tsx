@@ -62,8 +62,7 @@ export const ProductCatalogView: React.FC = () => {
   const [showCategoryModal, setShowCategoryModal] = useState<boolean>(false);
   const [showModifierModal, setShowModifierModal] = useState<boolean>(false);
 
-  const canManage =
-    currentUser?.role === 'administrador' || currentUser?.role === 'supervisor';
+  const canManage = currentUser?.role === 'administrador';
 
   // Sorted active categories
   const sortedCategories = useMemo(() => {

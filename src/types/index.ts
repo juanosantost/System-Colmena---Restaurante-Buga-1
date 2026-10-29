@@ -7,8 +7,12 @@
  * - Fondo Crema #FFFDF5
  */
 
+export type StandardUserRole = 'administrador' | 'asesor' | 'cocinero';
+
 export type UserRole =
   | 'administrador'
+  | 'asesor'
+  | 'cocinero'
   | 'supervisor'
   | 'cajero'
   | 'mesero'

@@ -40,13 +40,13 @@ export const DisbursementsView: React.FC<DisbursementsViewProps> = ({ onNavigate
   const { currentUser } = useAuth();
   const { showToast } = useToast();
 
-  const isAdminOrSupervisor = currentUser?.role === 'administrador' || currentUser?.role === 'supervisor';
+  const isAdmin = currentUser?.role === 'administrador';
 
   const [selectedDetailItem, setSelectedDetailItem] = useState<DisbursementItem | null>(null);
 
   // Filtros por defecto (hoy en Colombia para Asesor, o mes actual para Administrador)
   const todayStr = new Date().toISOString().split('T')[0];
-  const [startDate, setStartDate] = useState<string>(isAdminOrSupervisor ? todayStr.substring(0, 8) + '01' : todayStr);
+  const [startDate, setStartDate] = useState<string>(isAdmin ? todayStr.substring(0, 8) + '01' : todayStr);
   const [endDate, setEndDate] = useState<string>(todayStr);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [typeFilter, setTypeFilter] = useState<'todos' | 'compras' | 'gastos' | 'reintegros'>('todos');
@@ -545,7 +545,7 @@ export const DisbursementsView: React.FC<DisbursementsViewProps> = ({ onNavigate
 
                 {selectedDetailItem.type === 'compra' &&
                   selectedDetailItem.status === 'activo' &&
-                  isAdminOrSupervisor && (
+                  isAdmin && (
                     <button
                       type="button"
                       onClick={async () => {

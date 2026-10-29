@@ -266,9 +266,9 @@ export const DeliveryAndPickupView: React.FC = () => {
     try {
       // Regla de Negocio (Punto 7): Evitar marcar como entregado si no ha estado en camino, a menos que sea admin
       if (newStatus === 'entregado' && order.deliveryStatus !== 'en_camino') {
-        if (currentUser?.role !== 'administrador' && currentUser?.role !== 'supervisor') {
+        if (currentUser?.role !== 'administrador') {
           showToast(
-            'El pedido debe marcarse "En Camino" antes de confirmarse como "Entregado". Requieres rol de Supervisor.',
+            'El pedido debe marcarse "En Camino" antes de confirmarse como "Entregado". Requieres rol de Administrador.',
             'error'
           );
           return;

@@ -58,12 +58,9 @@ export const Header: React.FC = () => {
   }, []);
 
   const rolesList: { id: UserRole; label: string; desc: string }[] = [
-    { id: 'administrador', label: 'Administrador', desc: 'Control total del sistema' },
-    { id: 'cajero', label: 'Cajero', desc: 'Facturación y arqueo de caja' },
-    { id: 'mesero', label: 'Mesero', desc: 'Toma de pedidos y rondas' },
-    { id: 'cocina', label: 'Cocina (KDS)', desc: 'Monitor y preparación de comandas' },
-    { id: 'domiciliario', label: 'Domiciliario', desc: 'Entregas fuera del local' },
-    { id: 'supervisor', label: 'Supervisor', desc: 'Auditoría y control de salón' },
+    { id: 'administrador', label: 'Administrador', desc: 'Acceso total al sistema y configuraciones' },
+    { id: 'asesor', label: 'Asesor', desc: 'Acceso al apartado operación' },
+    { id: 'cocinero', label: 'Cocinero', desc: 'Acceso únicamente a la parte de cocina' },
   ];
 
   return (

@@ -108,8 +108,7 @@ export const TablesView: React.FC = () => {
     return orders.find((o) => o.id === table.currentOrderId && o.status === 'abierto');
   };
 
-  const isAdminOrSupervisor =
-    currentUser?.role === 'administrador' || currentUser?.role === 'supervisor';
+  const isAdmin = currentUser?.role === 'administrador';
 
   // Si está en subvista configuración, mostrar RestaurantConfigView
   if (activeSubView === 'configuracion') {
@@ -181,19 +180,19 @@ export const TablesView: React.FC = () => {
         <div className="col-span-2 sm:col-span-4 lg:col-span-1 bg-[#181818] p-3.5 rounded-2xl border border-[#B77900]/40 flex items-center justify-between shadow-md">
           <div>
             <span className="text-[10px] text-[#a8a29e] uppercase font-bold tracking-wider">
-              {isAdminOrSupervisor ? 'Configuración' : 'Nuevo Pedido'}
+              {isAdmin ? 'Configuración' : 'Nuevo Pedido'}
             </span>
             <p className="text-xs text-[#FFFDF5] font-semibold mt-0.5">
-              {isAdminOrSupervisor ? 'Salones & Mesas' : 'Comanda directa'}
+              {isAdmin ? 'Salones & Mesas' : 'Comanda directa'}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {isAdminOrSupervisor && (
+            {isAdmin && (
               <button
                 type="button"
                 onClick={() => setActiveSubView('configuracion')}
                 className="w-9 h-9 rounded-xl bg-[#292212] border border-[#B77900]/50 text-[#D6A21A] flex items-center justify-center font-bold hover:brightness-110 cursor-pointer shadow-md"
-                title="Configuración de Salones y Mesas (Módulo 02)"
+                title="Configuración de Salones y Mesas"
                 aria-label="Configurar salones y mesas"
               >
                 <Settings className="w-4 h-4" />
@@ -481,7 +480,7 @@ export const TablesView: React.FC = () => {
           <p className="text-xs text-[#d6d3d1] max-w-md mx-auto mb-4">
             Ajusta los filtros de salón o estado, o accede a la configuración para registrar nuevas mesas en esta sucursal.
           </p>
-          {isAdminOrSupervisor && (
+          {isAdmin && (
             <button
               type="button"
               onClick={() => setActiveSubView('configuracion')}

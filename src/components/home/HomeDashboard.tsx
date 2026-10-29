@@ -304,7 +304,7 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({ onNavigate }) => {
               <span>Nuevo Pedido</span>
             </button>
 
-            {onNavigate && (
+            {onNavigate && currentUser?.role === 'administrador' && (
               <>
                 <button
                   type="button"
