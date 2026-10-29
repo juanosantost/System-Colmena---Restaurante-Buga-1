@@ -417,6 +417,9 @@ export interface OrderItem {
   selectedModifiers?: SelectedModifierDetail[];
   adjustments?: ProductAdjustment[];
   effectiveRecipe?: RecipeIngredient[];
+  paid?: boolean;
+  paidAt?: string;
+  paidPaymentId?: string;
 }
 
 export type DeliveryStatus =
@@ -701,6 +704,8 @@ export interface Payment {
   customerNitOrCedula?: string;
   createdAt: string;
   branchSnapshot?: BranchReceiptSnapshot;
+  items?: OrderItem[];
+  selectedItemIds?: string[];
   status?: 'completado' | 'anulado';
   voidReason?: string;
   voidedAt?: string;

@@ -30,7 +30,26 @@ export function formatColombiaDateTime(dateInput: string | Date | number | null 
 }
 
 /**
+ * Determina la tasa de impoconsumo efectiva para una sucursal.
+ * Si showTax está desmarcado (false) en la configuración del comprobante o la tasa es 0,
+ * retorna 0 para que no se cobre ni totalice impoconsumo en el pedido.
+ */
+export function getEffectiveTaxRate(
+  branch: { taxRate?: number; receiptConfig?: { showTax?: boolean } } | null | undefined
+): number {
+  if (!branch) return 0.08;
+  if (branch.receiptConfig && branch.receiptConfig.showTax === false) {
+    return 0;
+  }
+  if (typeof branch.taxRate === 'number') {
+    return branch.taxRate;
+  }
+  return 0.08;
+}
+
+/**
  * Calcula subtotal, impuesto (por defecto Impoconsumo 8% en restaurantes Colombia) y propina voluntaria (10%).
+ * Si taxRate es 0 (por ejemplo cuando se desmarca el impoconsumo en la sucursal), el impuesto resultante es 0.
  */
 export function calculateOrderTotals(
   items: Array<{ price: number; quantity: number }>,
@@ -39,7 +58,8 @@ export function calculateOrderTotals(
   tipRate: number = 0.10
 ) {
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const tax = Math.round(subtotal * (taxRate || 0));
+  const effectiveTaxRate = typeof taxRate === 'number' ? taxRate : 0.08;
+  const tax = Math.round(subtotal * effectiveTaxRate);
   const tip = includeTip ? Math.round(subtotal * tipRate) : 0;
   const total = subtotal + tax + tip;
 

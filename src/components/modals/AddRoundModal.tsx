@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { MenuItem, Order } from '../../types';
-import { formatCOP, calculateOrderTotals } from '../../utils/calculations';
+import { formatCOP, calculateOrderTotals, getEffectiveTaxRate } from '../../utils/calculations';
 import {
   X,
   Plus,
@@ -167,7 +167,7 @@ export const AddRoundModal: React.FC<AddRoundModalProps> = ({
 
   const cartList = Object.values(roundCart);
   const cartItemCount = cartList.reduce((acc, i) => acc + i.quantity, 0);
-  const taxRate = currentBranch?.taxRate || 0.08;
+  const taxRate = getEffectiveTaxRate(currentBranch);
   const newRoundTotals = calculateOrderTotals(
     cartList.map((i) => ({ price: i.menuItem.price, quantity: i.quantity })),
     taxRate,

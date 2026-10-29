@@ -4,6 +4,7 @@ import { formatCOP, formatColombiaDateTime } from '../../utils/calculations';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { useAuth } from '../../context/AuthContext';
 import { BranchReceiptHeader } from '../common/BranchReceiptHeader';
+import { filterReceiptItems } from '../../utils/checkoutCalculations';
 import { Printer, X, CheckCircle } from 'lucide-react';
 
 interface ReceiptModalProps {
@@ -111,8 +112,8 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                 <span>TOTAL</span>
               </div>
               <div className="space-y-1.5 text-neutral-900">
-                {order && order.items && order.items.length > 0 ? (
-                  order.items.map((it) => (
+                {filterReceiptItems(payment, order).length > 0 ? (
+                  filterReceiptItems(payment, order).map((it) => (
                     <div key={it.id} className="flex justify-between">
                       <span className="truncate pr-2">
                         {it.quantity}x {it.name}
@@ -135,10 +136,12 @@ export const ReceiptModal: React.FC<ReceiptModalProps> = ({
                 <span>Subtotal:</span>
                 <span>{formatCOP(payment.subtotal)}</span>
               </div>
-              <div className="flex justify-between text-neutral-700">
-                <span>Impoconsumo (8%):</span>
-                <span>{formatCOP(payment.tax)}</span>
-              </div>
+              {payment.tax > 0 && (
+                <div className="flex justify-between text-neutral-700">
+                  <span>Impoconsumo ({Math.round((payment.tax / (payment.subtotal || 1)) * 100)}%):</span>
+                  <span>{formatCOP(payment.tax)}</span>
+                </div>
+              )}
               {payment.tipAmount > 0 && (
                 <div className="flex justify-between text-emerald-800 font-semibold">
                   <span>Propina Voluntaria:</span>

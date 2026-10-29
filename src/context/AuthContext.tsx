@@ -230,7 +230,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             city: raw.city || 'Guadalajara de Buga',
             logoUrl: raw.logoUrl || undefined,
             notes: raw.notes || '',
-            taxRate: raw.taxRate ?? 0.08,
+            taxRate: raw.taxRate !== undefined ? Number(raw.taxRate) : (raw.receiptConfig?.showTax === false ? 0 : 0.08),
             isActive: raw.isActive ?? true,
             status: (raw.isActive ?? true) ? 'activa' : 'inactiva',
             receiptConfig: raw.receiptConfig || {
@@ -703,7 +703,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       address: branchData.address.trim(),
       phone: branchData.phone.trim(),
       city: branchData.city?.trim() || 'Guadalajara de Buga',
-      taxRate: Number(branchData.taxRate) || 0.08,
+      taxRate: typeof branchData.taxRate === 'number' ? branchData.taxRate : (branchData.receiptConfig?.showTax === false ? 0 : 0.08),
       isActive: branchData.isActive ?? true,
       status: (branchData.isActive ?? true) ? 'activa' : 'inactiva',
       logoUrl: branchData.logoUrl || '',

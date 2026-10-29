@@ -257,10 +257,17 @@ export const OrdersView: React.FC = () => {
                         <span>Subtotal:</span>
                         <span>{formatCOP(order.subtotal)}</span>
                       </div>
-                      <div className="flex justify-between text-[#a8a29e]">
-                        <span>Impoconsumo (8%):</span>
-                        <span>{formatCOP(order.tax)}</span>
-                      </div>
+                      {order.tax > 0 ? (
+                        <div className="flex justify-between text-[#a8a29e]">
+                          <span>Impoconsumo ({order.subtotal > 0 ? Math.round((order.tax / order.subtotal) * 100) : 8}%):</span>
+                          <span>{formatCOP(order.tax)}</span>
+                        </div>
+                      ) : (
+                        <div className="flex justify-between text-[#78716c]">
+                          <span>Impoconsumo:</span>
+                          <span className="font-mono text-[#a8a29e]">$0</span>
+                        </div>
+                      )}
                       {order.tip > 0 && (
                         <div className="flex justify-between text-[#d4af37]">
                           <span>Propina (10%):</span>

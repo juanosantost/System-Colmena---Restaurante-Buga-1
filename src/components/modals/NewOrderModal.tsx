@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { MenuItem, OrderType, Table, Product, CustomizedItemSelection } from '../../types';
-import { formatCOP, calculateOrderTotals } from '../../utils/calculations';
+import { formatCOP, calculateOrderTotals, getEffectiveTaxRate } from '../../utils/calculations';
 import { ProductCustomizeModal } from '../catalog/ProductCustomizeModal';
 import {
   X,
@@ -65,7 +65,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   const [notes, setNotes] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('todos');
   const [searchFilter, setSearchFilter] = useState<string>('');
-  const [includeTax, setIncludeTax] = useState<boolean>(true);
+  const [includeTax, setIncludeTax] = useState<boolean>(() => getEffectiveTaxRate(currentBranch) > 0);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
   const [validationError, setValidationError] = useState<string>('');
 
@@ -250,7 +250,7 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
   };
 
   const cartItemCount = cartItems.reduce((acc, i) => acc + i.quantity, 0);
-  const taxRate = currentBranch?.taxRate || 0.08;
+  const taxRate = getEffectiveTaxRate(currentBranch);
   const totals = calculateOrderTotals(
     cartItems.map((i) => ({ price: i.unitPrice, quantity: i.quantity })),
     includeTax ? taxRate : 0,
@@ -991,20 +991,27 @@ export const NewOrderModal: React.FC<NewOrderModalProps> = ({
                       <span className="font-semibold text-[#fef3c7] font-mono">{formatCOP(totals.subtotal)}</span>
                     </div>
 
-                    <div className="flex items-center justify-between pt-1">
-                      <label className="flex items-center gap-2 cursor-pointer select-none text-[#fef3c7] hover:text-white">
-                        <input
-                          type="checkbox"
-                          checked={includeTax}
-                          onChange={(e) => setIncludeTax(e.target.checked)}
-                          className="w-4 h-4 rounded bg-[#121117] border-[#383124] accent-[#d4af37] cursor-pointer"
-                        />
-                        <span className="text-xs font-bold">Incluir Impoconsumo ({Math.round(taxRate * 100)}%):</span>
-                      </label>
-                      <span className="font-semibold text-[#d4af37] font-mono">
-                        {includeTax ? formatCOP(totals.tax) : '$0'}
-                      </span>
-                    </div>
+                    {taxRate > 0 ? (
+                      <div className="flex items-center justify-between pt-1">
+                        <label className="flex items-center gap-2 cursor-pointer select-none text-[#fef3c7] hover:text-white">
+                          <input
+                            type="checkbox"
+                            checked={includeTax}
+                            onChange={(e) => setIncludeTax(e.target.checked)}
+                            className="w-4 h-4 rounded bg-[#121117] border-[#383124] accent-[#d4af37] cursor-pointer"
+                          />
+                          <span className="text-xs font-bold">Incluir Impoconsumo ({Math.round(taxRate * 100)}%):</span>
+                        </label>
+                        <span className="font-semibold text-[#d4af37] font-mono">
+                          {includeTax ? formatCOP(totals.tax) : '$0'}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between pt-1 text-xs">
+                        <span className="text-[#a8a29e]">Impoconsumo:</span>
+                        <span className="font-mono text-[#78716c]">Desactivado en Sede ($0)</span>
+                      </div>
+                    )}
 
                     <div className="pt-2 border-t border-[#2d281e] flex justify-between items-center text-sm sm:text-base font-black">
                       <span className="text-[#fef3c7]">Total Estimado:</span>

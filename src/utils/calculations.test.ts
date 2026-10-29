@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   formatCOP,
   calculateOrderTotals,
+  getEffectiveTaxRate,
   getNewItemsForKitchen,
   calculateRecipeDeductions,
   calculateCashBalance,
@@ -14,6 +15,25 @@ test('formatCOP formats currency in Colombian Pesos correctly', () => {
   assert.equal(formatCOP(0), '$ 0 COP');
   assert.equal(formatCOP(25000), '$ 25.000 COP');
   assert.equal(formatCOP(1500000), '$ 1.500.000 COP');
+});
+
+test('getEffectiveTaxRate respects branch settings and disabled impoconsumo', () => {
+  // Caso 1: Sucursal nula o sin config -> 8% estándar Colombia
+  assert.equal(getEffectiveTaxRate(null), 0.08);
+  assert.equal(getEffectiveTaxRate(undefined), 0.08);
+
+  // Caso 2: Sucursal con showTax desmarcado (false) -> 0%
+  assert.equal(getEffectiveTaxRate({ receiptConfig: { showTax: false } }), 0);
+  assert.equal(getEffectiveTaxRate({ taxRate: 0.08, receiptConfig: { showTax: false } }), 0);
+
+  // Caso 3: Sucursal con taxRate explícito en 0 -> 0%
+  assert.equal(getEffectiveTaxRate({ taxRate: 0, receiptConfig: { showTax: true } }), 0);
+
+  // Caso 4: Sucursal con impoconsumo marcado y 8% -> 0.08
+  assert.equal(getEffectiveTaxRate({ taxRate: 0.08, receiptConfig: { showTax: true } }), 0.08);
+
+  // Caso 5: Sucursal con tarifa personalizada (ej. 0.05) y showTax activo
+  assert.equal(getEffectiveTaxRate({ taxRate: 0.05, receiptConfig: { showTax: true } }), 0.05);
 });
 
 test('calculateOrderTotals computes subtotal, 8% impoconsumo and 10% tip correctly', () => {
@@ -37,6 +57,29 @@ test('calculateOrderTotals computes subtotal, 8% impoconsumo and 10% tip correct
   assert.equal(noTipTotals.tax, 4000);
   assert.equal(noTipTotals.tip, 0);
   assert.equal(noTipTotals.total, 54000);
+});
+
+test('calculateOrderTotals does NOT total impoconsumo when taxRate is 0 (desmarcado en sucursal)', () => {
+  const items = [
+    { price: 20000, quantity: 2 }, // 40000
+    { price: 10000, quantity: 1 }, // 10000
+  ];
+  // Subtotal = 50000
+  // Tax = 0 (impoconsumo desmarcado)
+  // Tip (10%) = 5000
+  // Total = 55000 (sin impoconsumo)
+  const totals = calculateOrderTotals(items, 0, true, 0.10);
+  assert.equal(totals.subtotal, 50000);
+  assert.equal(totals.tax, 0);
+  assert.equal(totals.tip, 5000);
+  assert.equal(totals.total, 55000);
+
+  // Without tip: total equals exact subtotal
+  const noTipTotals = calculateOrderTotals(items, 0, false, 0.10);
+  assert.equal(noTipTotals.subtotal, 50000);
+  assert.equal(noTipTotals.tax, 0);
+  assert.equal(noTipTotals.tip, 0);
+  assert.equal(noTipTotals.total, 50000);
 });
 
 test('getNewItemsForKitchen isolates items in new rounds without duplicating sent items', () => {

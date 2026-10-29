@@ -79,6 +79,7 @@ import {
   calculateRecipeDeductions,
   calculateCashBalance,
   formatCOP,
+  getEffectiveTaxRate,
 } from '../utils/calculations';
 import {
   calculateNewAverageCost,
@@ -89,6 +90,12 @@ import {
   calculateEarnedPoints,
   DEFAULT_LOYALTY_CONFIG,
 } from '../utils/loyaltyUtils';
+import {
+  calculateSelectedItemsTotals,
+  markItemsAsPaid,
+  isOrderFullyPaid,
+  getInitialSelectedItemIds,
+} from '../utils/checkoutCalculations';
 import {
   recalculateCarteraBalance,
   recalculateSeparadoBalance,
@@ -218,7 +225,10 @@ interface RestaurantContextType {
     tipAmount: number;
     customerName?: string;
     customerNitOrCedula?: string;
+    selectedItemIds?: string[];
+    updatedItems?: OrderItem[];
   }) => Promise<Payment>;
+  updateOrderItems: (orderId: string, updatedItems: OrderItem[]) => Promise<void>;
 
   openCashShift: (initialCash: number, notes?: string) => Promise<void>;
   addCashBase: (amount: number, reason: string) => Promise<void>;
@@ -918,7 +928,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       }));
 
       // Totales
-      const taxRate = currentBranch?.taxRate || 0.08;
+      const taxRate = getEffectiveTaxRate(currentBranch);
       const { subtotal, tax, tip, total } = calculateOrderTotals(orderItems, taxRate, includeTip, 0.10);
 
       const now = new Date().toISOString();
@@ -1070,7 +1080,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const allItems = [...targetOrder.items, ...roundOrderItems];
 
       // Recalcular totales
-      const taxRate = currentBranch?.taxRate || 0.08;
+      const taxRate = getEffectiveTaxRate(currentBranch);
       const hasTip = targetOrder.tip > 0;
       const { subtotal, tax, tip, total } = calculateOrderTotals(allItems, taxRate, hasTip, 0.10);
 
@@ -1262,10 +1272,49 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     }
   };
 
-  // OPERACIÓN 4: Cobro y Facturación de Orden
+  const updateOrderItems = async (orderId: string, updatedItems: OrderItem[]) => {
+    if (actionLoading) throw new Error('Operación en proceso');
+    setActionLoading(true);
+    try {
+      const order = orders.find((o) => o.id === orderId);
+      if (!order) throw new Error('Orden no encontrada');
+
+      const now = new Date().toISOString();
+      const taxRate = getEffectiveTaxRate(currentBranch);
+      const subtotal = updatedItems.reduce((acc, it) => acc + it.price * it.quantity, 0);
+      const tax = Math.round(subtotal * taxRate);
+      const tip = order.tip > 0 ? order.tip : 0;
+      const total = subtotal + tax + tip;
+
+      await updateDoc(doc(db, 'orders', orderId), sanitizeFirestoreData({
+        items: updatedItems,
+        subtotal,
+        tax,
+        total,
+        updatedAt: now,
+      }));
+
+      if (order.tableId) {
+        await updateDoc(doc(db, 'tables', order.tableId), {
+          currentBillAmount: total,
+          updatedAt: now,
+        });
+      }
+    } catch (error) {
+      console.error('Error updating order items:', error);
+      handleFirestoreError(error, OperationType.UPDATE, 'orders');
+      throw error;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // OPERACIÓN 4: Cobro y Facturación de Orden con Selección Parcial y Control de Ítems Pagados
   // REGLAS COLMENA:
-  // - La emisión de comanda NO significa cobro; el cobro se ejecuta de forma independiente.
-  // - Se registra en `payments`, se actualiza el turno de caja `cashShifts` y se libera la mesa si aplica.
+  // - Permite seleccionar los ítems a cobrar y calcular el total de forma dinámica.
+  // - Los ítems cobrados quedan marcados con paid: true.
+  // - Si todos los ítems fueron cobrados, la orden pasa a 'facturado' y la mesa se libera.
+  // - Si quedan ítems pendientes, la orden permanece 'abierto' para pagos posteriores.
   const closeAndPayOrder = async ({
     orderId,
     method,
@@ -1274,6 +1323,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     tipAmount,
     customerName,
     customerNitOrCedula,
+    selectedItemIds,
+    updatedItems,
   }: {
     orderId: string;
     method: PaymentMethod;
@@ -1282,6 +1333,8 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     tipAmount: number;
     customerName?: string;
     customerNitOrCedula?: string;
+    selectedItemIds?: string[];
+    updatedItems?: OrderItem[];
   }): Promise<Payment> => {
     if (actionLoading) throw new Error('Operación en proceso');
     setActionLoading(true);
@@ -1291,7 +1344,28 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       if (!order) throw new Error('Orden no encontrada');
 
       const now = new Date().toISOString();
-      const change = Math.max(0, amountPaid - order.total);
+      const currentItems: OrderItem[] = updatedItems || order.items || [];
+      const taxRate = getEffectiveTaxRate(currentBranch);
+
+      // Determinar los IDs seleccionados para este pago
+      const effectiveSelectedIds =
+        selectedItemIds && selectedItemIds.length > 0
+          ? selectedItemIds
+          : getInitialSelectedItemIds(currentItems);
+
+      // Calcular montos específicos de los ítems seleccionados
+      const totalsResult = calculateSelectedItemsTotals(
+        currentItems,
+        effectiveSelectedIds,
+        tipAmount > 0,
+        tipAmount,
+        taxRate
+      );
+
+      const paymentSubtotal = totalsResult.subtotal;
+      const paymentTax = totalsResult.tax;
+      const paymentTotal = totalsResult.total;
+      const change = Math.max(0, amountPaid - paymentTotal);
 
       // 1. Obtener sucursal de origen real y congelar snapshot histórico
       const docBranchId = order.branchId || currentBranchId;
@@ -1316,7 +1390,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         issuedAt: now,
       };
 
-      // 2. Crear documento de pago
+      // 2. Crear documento de pago con los ítems cobrados
       const paymentId = `pay-${Date.now()}`;
       const payment: Payment = {
         id: paymentId,
@@ -1327,10 +1401,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         method,
         splits: splits || [],
         amountPaid,
-        subtotal: order.subtotal,
-        tax: order.tax,
+        subtotal: paymentSubtotal,
+        tax: paymentTax,
         tipAmount,
-        total: order.total,
+        total: paymentTotal,
         change,
         cashierId: userRole === 'cajero' ? 'usr-cajero' : 'usr-staff',
         cashierName: staffName,
@@ -1338,13 +1412,27 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         customerNitOrCedula: customerNitOrCedula || '222222222222',
         createdAt: now,
         branchSnapshot,
+        items: totalsResult.selectedItems,
+        selectedItemIds: effectiveSelectedIds,
       };
 
       await setDoc(doc(db, 'payments', paymentId), sanitizeFirestoreData(payment));
 
-      // 3. Marcar Orden como 'facturado' y preservar snapshot de sucursal
+      // 3. Marcar los ítems seleccionados como pagados
+      const updatedOrderItems = markItemsAsPaid(currentItems, effectiveSelectedIds, paymentId, now);
+      const allItemsPaid = isOrderFullyPaid(updatedOrderItems);
+
+      // Recalcular el total global del pedido
+      const newOrderSubtotal = updatedOrderItems.reduce((acc, it) => acc + it.price * it.quantity, 0);
+      const newOrderTax = Math.round(newOrderSubtotal * taxRate);
+      const newOrderTotal = newOrderSubtotal + newOrderTax + (order.tip || 0);
+
       await updateDoc(doc(db, 'orders', order.id), sanitizeFirestoreData({
-        status: 'facturado',
+        status: allItemsPaid ? 'facturado' : 'abierto',
+        items: updatedOrderItems,
+        subtotal: newOrderSubtotal,
+        tax: newOrderTax,
+        total: newOrderTotal,
         tip: tipAmount,
         updatedAt: now,
         branchSnapshot,
@@ -1357,10 +1445,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           (c) => c.name.toLowerCase() === finalCustomerName.toLowerCase() || (order.customerPhone && c.phone.includes(order.customerPhone))
         );
         if (matchingCustomer && DEFAULT_LOYALTY_CONFIG.isEnabled) {
-          const earned = calculateEarnedPoints(order.total, DEFAULT_LOYALTY_CONFIG);
+          const earned = calculateEarnedPoints(paymentTotal, DEFAULT_LOYALTY_CONFIG);
           if (earned > 0) {
             const newPts = (matchingCustomer.loyaltyPoints || 0) + earned;
-            const newSpent = (matchingCustomer.totalSpent || 0) + order.total;
+            const newSpent = (matchingCustomer.totalSpent || 0) + paymentTotal;
             const newVisits = (matchingCustomer.visitsCount || 0) + 1;
             await updateDoc(doc(db, 'customers', matchingCustomer.id), {
               loyaltyPoints: newPts,
@@ -1387,29 +1475,42 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         }
       }
 
-      // 3. Si es mesa, liberarla a 'libre'
+      // 4. Si es mesa y se pagaron todos los ítems, liberarla a 'libre'
       if (order.tableId) {
-        await updateDoc(doc(db, 'tables', order.tableId), {
-          status: 'libre',
-          currentOrderId: null,
-          assignedWaiterName: null,
-          openedAt: null,
-          updatedAt: now,
-        });
+        if (allItemsPaid) {
+          await updateDoc(doc(db, 'tables', order.tableId), {
+            status: 'libre',
+            currentOrderId: null,
+            assignedWaiterName: null,
+            openedAt: null,
+            currentBillAmount: 0,
+            hasOpenTab: false,
+            updatedAt: now,
+          });
+        } else {
+          // Si quedan ítems pendientes, calcular saldo restante de la mesa
+          const remainingItems = updatedOrderItems.filter((it) => !it.paid);
+          const remainingSubtotal = remainingItems.reduce((acc, it) => acc + it.price * it.quantity, 0);
+          const remainingTotal = remainingSubtotal + Math.round(remainingSubtotal * taxRate);
+          await updateDoc(doc(db, 'tables', order.tableId), {
+            currentBillAmount: remainingTotal,
+            updatedAt: now,
+          });
+        }
       }
 
-      // 4. Si hay turno de caja abierto, acumular los ingresos
+      // 5. Si hay turno de caja abierto, acumular los ingresos del pago actual
       if (activeShift) {
         let addCash = 0;
         let addCard = 0;
         let addTransfer = 0;
 
         if (method === 'efectivo') {
-          addCash = order.total;
+          addCash = paymentTotal;
         } else if (method === 'tarjeta') {
-          addCard = order.total;
+          addCard = paymentTotal;
         } else if (method === 'nequi_daviplata' || method === 'transferencia') {
-          addTransfer = order.total;
+          addTransfer = paymentTotal;
         } else if (method === 'mixto' && splits) {
           for (const s of splits) {
             if (s.method === 'efectivo') addCash += s.amount;
@@ -4752,6 +4853,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
         updateComandaStatus,
         updateComandaItemStatus,
         closeAndPayOrder,
+        updateOrderItems,
         openCashShift,
         addCashBase,
         updateCashBase,

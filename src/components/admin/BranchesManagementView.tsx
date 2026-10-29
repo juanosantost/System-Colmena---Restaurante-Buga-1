@@ -130,7 +130,8 @@ export const BranchesManagementView: React.FC = () => {
     setCity(b.city || 'Guadalajara de Buga');
     setNotes(b.notes || '');
     setIsActive(b.isActive ?? true);
-    setTaxRate(b.taxRate ?? 0.08);
+    const isTaxActive = b.receiptConfig?.showTax !== false && b.taxRate !== 0;
+    setTaxRate(isTaxActive ? (b.taxRate ?? 0.08) : 0);
 
     // Logotipo
     setLogoUrl(b.logoUrl || '');
@@ -152,7 +153,7 @@ export const BranchesManagementView: React.FC = () => {
     setResolutionDate(b.receiptConfig?.resolutionDate || '');
     setPrefix(b.receiptConfig?.prefix || 'COL-');
     setCurrentNumber(b.receiptConfig?.currentNumber || 1);
-    setShowTax(b.receiptConfig?.showTax ?? true);
+    setShowTax(isTaxActive);
     setShowTip(b.receiptConfig?.showTip ?? true);
 
     setIsModalOpen(true);
@@ -242,6 +243,8 @@ export const BranchesManagementView: React.FC = () => {
         showTip,
       };
 
+      const effectiveTaxRate = showTax ? (Number(taxRate) > 0 ? Number(taxRate) : 0.08) : 0;
+
       if (editingBranch) {
         // En edición: preservar estrictamente el ID y fecha original
         await updateBranchData(editingBranch.id, {
@@ -254,7 +257,7 @@ export const BranchesManagementView: React.FC = () => {
           logoUrl: logoUrl.trim(),
           isActive,
           status: isActive ? 'activa' : 'inactiva',
-          taxRate: Number(taxRate) || 0.08,
+          taxRate: effectiveTaxRate,
           printConfig,
           receiptConfig,
         });
@@ -269,7 +272,7 @@ export const BranchesManagementView: React.FC = () => {
           city: city.trim(),
           notes: notes.trim(),
           logoUrl: logoUrl.trim(),
-          taxRate: Number(taxRate) || 0.08,
+          taxRate: effectiveTaxRate,
           isActive,
           status: isActive ? 'activa' : 'inactiva',
           printConfig,
@@ -328,6 +331,8 @@ export const BranchesManagementView: React.FC = () => {
       footerText,
       prefix,
       currentNumber,
+      showTax,
+      taxRate: showTax ? (Number(taxRate) > 0 ? Number(taxRate) : 0.08) : 0,
     });
     setIsPreviewModalOpen(true);
   };
@@ -431,7 +436,7 @@ export const BranchesManagementView: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <Coins className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Impoconsumo: {((b.taxRate ?? 0.08) * 100).toFixed(0)}%</span>
+                    <span>Impoconsumo: {((b.receiptConfig?.showTax === false || b.taxRate === 0) ? 0 : ((b.taxRate ?? 0.08) * 100)).toFixed(0)}%</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span
@@ -777,9 +782,26 @@ export const BranchesManagementView: React.FC = () => {
                       min="0"
                       max="0.5"
                       value={taxRate}
-                      onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0.08)}
-                      className="w-full bg-[#242424] border border-[#383838] rounded-xl px-3 py-2 text-xs text-[#FFFDF5] focus:outline-none focus:border-[#D6A21A]"
+                      disabled={!showTax}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        const safeVal = isNaN(val) ? 0 : val;
+                        setTaxRate(safeVal);
+                        if (safeVal === 0) {
+                          setShowTax(false);
+                        } else {
+                          setShowTax(true);
+                        }
+                      }}
+                      className={`w-full bg-[#242424] border border-[#383838] rounded-xl px-3 py-2 text-xs text-[#FFFDF5] focus:outline-none focus:border-[#D6A21A] ${
+                        !showTax ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
                     />
+                    {!showTax && (
+                      <p className="text-[11px] text-amber-400/90 mt-1">
+                        Impoconsumo desmarcado: los pedidos de esta sucursal no sumarán impuesto al total.
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1111,25 +1133,40 @@ export const BranchesManagementView: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="flex flex-wrap items-center gap-6 pt-1">
-                  <label className="flex items-center gap-2 text-xs text-[#FFFDF5] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={showTax}
-                      onChange={(e) => setShowTax(e.target.checked)}
-                      className="accent-[#B77900] w-4 h-4 cursor-pointer"
-                    />
-                    <span>Discriminar Impoconsumo 8%</span>
-                  </label>
-                  <label className="flex items-center gap-2 text-xs text-[#FFFDF5] cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={showTip}
-                      onChange={(e) => setShowTip(e.target.checked)}
-                      className="accent-[#B77900] w-4 h-4 cursor-pointer"
-                    />
-                    <span>Incluir Sugerencia de Propina (10%)</span>
-                  </label>
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex flex-wrap items-center gap-6">
+                    <label className="flex items-center gap-2 text-xs text-[#FFFDF5] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showTax}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setShowTax(checked);
+                          if (!checked) {
+                            setTaxRate(0);
+                          } else if (taxRate === 0) {
+                            setTaxRate(0.08);
+                          }
+                        }}
+                        className="accent-[#B77900] w-4 h-4 cursor-pointer"
+                      />
+                      <span className="font-semibold">Cobrar y discriminar Impoconsumo (8%)</span>
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-[#FFFDF5] cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showTip}
+                        onChange={(e) => setShowTip(e.target.checked)}
+                        className="accent-[#B77900] w-4 h-4 cursor-pointer"
+                      />
+                      <span>Incluir Sugerencia de Propina (10%)</span>
+                    </label>
+                  </div>
+                  <p className="text-[11px] text-[#a8a29e] pl-6">
+                    {showTax
+                      ? 'Se liquidará y totalizará el impuesto al consumo en los pedidos y comprobantes POS de esta sucursal.'
+                      : 'Desmarcado: los pedidos y facturas de esta sucursal NO liquidarán ni totalizarán impoconsumo (tarifa 0%).'}
+                  </p>
                 </div>
               </div>
 

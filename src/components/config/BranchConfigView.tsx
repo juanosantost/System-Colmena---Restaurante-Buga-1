@@ -110,7 +110,7 @@ export const BranchConfigView: React.FC<BranchConfigViewProps> = ({ onNavigateTo
 
                 <div className="mt-3 pt-2 border-t border-[#2d281e] flex items-center justify-between text-xs text-[#d6d3d1]">
                   <span>Teléfono: {branch.phone}</span>
-                  <span className="text-[#d4af37] font-bold">Impoconsumo: {(branch.taxRate * 100).toFixed(0)}%</span>
+                  <span className="text-[#d4af37] font-bold">Impoconsumo: {((branch.receiptConfig?.showTax === false || branch.taxRate === 0) ? 0 : (branch.taxRate * 100)).toFixed(0)}%</span>
                 </div>
               </div>
             );

@@ -29,6 +29,8 @@ interface BranchReceiptPreviewModalProps {
     footerText?: string;
     prefix?: string;
     currentNumber?: number;
+    showTax?: boolean;
+    taxRate?: number;
   };
   onClose: () => void;
   onUpdatePrintConfig?: (config: BranchPrintConfig) => void;
@@ -350,24 +352,40 @@ export const BranchReceiptPreviewModal: React.FC<BranchReceiptPreviewModalProps>
               </div>
 
               {/* Totales */}
-              <div className="py-2.5 border-b border-dashed border-[#a8a29e] space-y-1">
-                <div className="flex justify-between text-neutral-700">
-                  <span>Subtotal:</span>
-                  <span>{formatCOP(55556)}</span>
-                </div>
-                <div className="flex justify-between text-neutral-700">
-                  <span>Impoconsumo (8%):</span>
-                  <span>{formatCOP(4444)}</span>
-                </div>
-                <div className="flex justify-between text-emerald-800 font-semibold">
-                  <span>Propina Voluntaria (10%):</span>
-                  <span>{formatCOP(6000)}</span>
-                </div>
-                <div className="flex justify-between font-black text-sm pt-1.5 border-t border-neutral-400 text-neutral-900">
-                  <span>TOTAL:</span>
-                  <span>{formatCOP(66000)}</span>
-                </div>
-              </div>
+              {(() => {
+                const effectiveShowTax =
+                  overrideData?.showTax !== undefined
+                    ? overrideData.showTax
+                    : (branch?.receiptConfig?.showTax !== false && (branch?.taxRate ?? 0.08) > 0);
+                const subtotal = 60000;
+                const tax = effectiveShowTax ? Math.round(subtotal * ((branch?.taxRate ?? 0.08) || 0.08)) : 0;
+                const tip = 6000;
+                const total = subtotal + tax + tip;
+                const taxRatePercent = Math.round(((branch?.taxRate ?? 0.08) || 0.08) * 100);
+
+                return (
+                  <div className="py-2.5 border-b border-dashed border-[#a8a29e] space-y-1">
+                    <div className="flex justify-between text-neutral-700">
+                      <span>Subtotal:</span>
+                      <span>{formatCOP(subtotal)}</span>
+                    </div>
+                    {effectiveShowTax && (
+                      <div className="flex justify-between text-neutral-700">
+                        <span>Impoconsumo ({taxRatePercent}%):</span>
+                        <span>{formatCOP(tax)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-emerald-800 font-semibold">
+                      <span>Propina Voluntaria (10%):</span>
+                      <span>{formatCOP(tip)}</span>
+                    </div>
+                    <div className="flex justify-between font-black text-sm pt-1.5 border-t border-neutral-400 text-neutral-900">
+                      <span>TOTAL:</span>
+                      <span>{formatCOP(total)}</span>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Medios de Pago */}
               <div className="py-2 border-b border-dashed border-[#a8a29e] text-[10px] space-y-0.5 text-neutral-800">
