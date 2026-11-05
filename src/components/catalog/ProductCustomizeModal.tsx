@@ -33,6 +33,7 @@ import {
   DollarSign,
   Edit3,
   Trash2,
+  UtensilsCrossed,
 } from 'lucide-react';
 
 export interface ProductCustomizeModalProps {
@@ -349,10 +350,8 @@ export const ProductCustomizeModal: React.FC<ProductCustomizeModalProps> = ({
     onClose();
   };
 
-  const images =
-    product.images && product.images.length > 0
-      ? product.images
-      : ['https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80'];
+  const hasCustomImages = Boolean(product.images && product.images.length > 0);
+  const images = hasCustomImages ? product.images! : [];
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto">
@@ -367,8 +366,12 @@ export const ProductCustomizeModal: React.FC<ProductCustomizeModalProps> = ({
               <h2 className="text-base font-black text-[#fef3c7] leading-tight">
                 {initialItem ? 'Editar Detalles del Producto' : 'Personalizar Producto / Agregar con Detalles'}
               </h2>
-              <p className="text-xs text-[#a8a29e]">
-                {product.name} · SKU: <span className="font-mono text-[#d4af37]">{product.sku}</span>
+              <p className="text-xs text-[#a8a29e] flex items-center gap-1.5 mt-0.5">
+                <span>{product.name}</span>
+                <span>· SKU:</span>
+                <span className="sku-badge px-1.5 py-0.5 rounded font-mono font-bold text-[#d4af37] bg-[#292212] border border-[#B77900]/40">
+                  {product.sku}
+                </span>
               </p>
             </div>
           </div>
@@ -386,12 +389,19 @@ export const ProductCustomizeModal: React.FC<ProductCustomizeModalProps> = ({
           {/* Gallery & Description Hero */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
             <div className="md:col-span-5 flex flex-col gap-2">
-              <div className="relative h-40 rounded-2xl overflow-hidden bg-[#18171f] border border-[#2d281e]">
-                <img
-                  src={images[activePhotoIdx] || images[0]}
-                  alt={product.name}
-                  className="w-full h-full object-cover"
-                />
+              <div className="relative h-40 rounded-2xl overflow-hidden bg-[#18171f] border border-[#2d281e] flex items-center justify-center">
+                {hasCustomImages ? (
+                  <img
+                    src={images[activePhotoIdx] || images[0]}
+                    alt={product.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-zinc-500">
+                    <UtensilsCrossed className="w-10 h-10 mb-1 opacity-40 text-[#d4af37]" />
+                    <span className="text-xs font-medium text-zinc-400">Sin fotografía asignada</span>
+                  </div>
+                )}
                 <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full bg-black/80 backdrop-blur-sm text-[10px] text-[#fef3c7] flex items-center gap-1 border border-white/10">
                   <Clock className="w-3 h-3 text-[#d4af37]" />
                   <span>{product.prepTimeMinutes || 15} min prep</span>

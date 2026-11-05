@@ -17,6 +17,7 @@ import { useToast } from '../../context/ToastContext';
 import { formatProductPrice } from '../../utils/productUtils';
 import { formatCOP } from '../../utils/calculations';
 import { InventoryItemModal } from '../inventory/InventoryItemModal';
+import { sanitizeFirestoreData } from '../../services/firebase';
 import {
   X,
   Plus,
@@ -97,11 +98,9 @@ export const ProductManagementModal: React.FC<ProductManagementModalProps> = ({
     product?.isVisibleInMenu ?? true
   );
 
-  // Fotografías
+  // Fotografías (sin fotos por defecto para nuevos productos)
   const [images, setImages] = useState<string[]>(
-    product?.images && product.images.length > 0
-      ? product.images.slice(0, 3)
-      : ['https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=800&q=80']
+    product?.images && product.images.length > 0 ? product.images.slice(0, 3) : []
   );
   const [newImageUrl, setNewImageUrl] = useState<string>('');
 
@@ -167,7 +166,8 @@ export const ProductManagementModal: React.FC<ProductManagementModalProps> = ({
     const invItem = inventory.find((i) => i.id === selectedInvId);
     if (!invItem) return;
 
-    if (selectedInvQty <= 0) {
+    const qty = Number(selectedInvQty) || 0;
+    if (qty <= 0) {
       showToast('La cantidad debe ser mayor a 0', 'warning');
       return;
     }
@@ -175,7 +175,7 @@ export const ProductManagementModal: React.FC<ProductManagementModalProps> = ({
     const existingIdx = recipe.findIndex((r) => r.inventoryItemId === selectedInvId);
     if (existingIdx >= 0) {
       const updated = [...recipe];
-      updated[existingIdx].quantity += selectedInvQty;
+      updated[existingIdx].quantity += qty;
       setRecipe(updated);
     } else {
       setRecipe([
@@ -183,7 +183,7 @@ export const ProductManagementModal: React.FC<ProductManagementModalProps> = ({
         {
           inventoryItemId: invItem.id,
           name: invItem.name,
-          quantity: selectedInvQty,
+          quantity: qty,
           unit: invItem.unit,
         },
       ]);
@@ -355,10 +355,7 @@ export const ProductManagementModal: React.FC<ProductManagementModalProps> = ({
       showToast('El precio debe ser válido y no negativo', 'error');
       return;
     }
-    if (recipe.length === 0) {
-      showToast('Debes configurar la composición del producto (al menos 1 artículo de inventario)', 'warning');
-      return;
-    }
+    // Composición de inventario es opcional (no obligatoria)
 
     const categoryObj = catalogCategories.find((c) => c.id === categoryId);
     const prepStationObj = prepStations.find((s) => s.id === prepStationId);
@@ -374,19 +371,14 @@ export const ProductManagementModal: React.FC<ProductManagementModalProps> = ({
         }
       : undefined;
 
-    const payload = {
+    const rawPayload: Record<string, any> = {
       name: name.trim(),
       description: description.trim(),
       categoryId,
       categoryName: categoryObj?.name || 'Gastronomía',
       price: Number(price),
       sku: sku.trim().toUpperCase(),
-      reference: reference.trim() || undefined,
-      barcode: barcode.trim() || undefined,
-      size: size.trim() || undefined,
-      color: color.trim() || undefined,
       unit: unit.trim() || 'und',
-      observations: observations.trim() || undefined,
       images: images.slice(0, 3),
       branchId,
       prepStationId,
@@ -400,9 +392,17 @@ export const ProductManagementModal: React.FC<ProductManagementModalProps> = ({
       modifierGroupIds: selectedModifierGroupIds,
       featureGroups,
       isCombo,
-      comboConfig: comboConfigData,
       recipe,
     };
+
+    if (reference.trim()) rawPayload.reference = reference.trim();
+    if (barcode.trim()) rawPayload.barcode = barcode.trim();
+    if (size.trim()) rawPayload.size = size.trim();
+    if (color.trim()) rawPayload.color = color.trim();
+    if (observations.trim()) rawPayload.observations = observations.trim();
+    if (isCombo && comboConfigData) rawPayload.comboConfig = comboConfigData;
+
+    const payload = sanitizeFirestoreData(rawPayload) as Omit<Product, 'id' | 'createdAt' | 'updatedAt'>;
 
     try {
       if (isEditing && product) {
@@ -436,7 +436,7 @@ export const ProductManagementModal: React.FC<ProductManagementModalProps> = ({
                 {isEditing ? 'Editar Producto Comercial de Venta' : 'Registrar Nuevo Producto Comercial de Venta'}
               </h2>
               <p className="text-xs text-[#a8a29e]">
-                Producto del Menú con Composición de Inventario Independiente
+                Gestión y Registro de Producto Comercial del Catálogo POS
               </p>
             </div>
           </div>
@@ -450,7 +450,7 @@ export const ProductManagementModal: React.FC<ProductManagementModalProps> = ({
         </div>
 
         {/* Scrollable Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
+        <form onSubmit={handleSubmit} noValidate className="flex-1 overflow-y-auto p-6 space-y-6">
           
           {/* 1. INFORMACIÓN COMERCIAL */}
           <div className="p-4 rounded-2xl bg-[#1a1922] border border-[#383124] space-y-4 shadow-md">
@@ -605,10 +605,10 @@ export const ProductManagementModal: React.FC<ProductManagementModalProps> = ({
               <div>
                 <h3 className="text-xs font-black text-[#d4af37] uppercase tracking-wider flex items-center gap-1.5">
                   <Calculator className="w-4 h-4" />
-                  <span>2. Composición de Inventario del Producto *</span>
+                  <span>2. Composición de Inventario del Producto (Opcional)</span>
                 </h3>
                 <p className="text-[11px] text-[#a8a29e]">
-                  Indica cuáles artículos de inventario se descuentan por cada unidad vendida
+                  Opcional: Si este producto descuenta insumos de bodega por cada unidad vendida, agrégalos aquí.
                 </p>
               </div>
 
@@ -641,10 +641,13 @@ export const ProductManagementModal: React.FC<ProductManagementModalProps> = ({
               <div className="flex items-center gap-2 w-full sm:w-auto">
                 <input
                   type="number"
-                  min={0.01}
-                  step={0.1}
+                  min="0"
+                  step="any"
                   value={selectedInvQty}
-                  onChange={(e) => setSelectedInvQty(parseFloat(e.target.value) || 1)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedInvQty(val === '' ? ('' as any) : parseFloat(val));
+                  }}
                   className="w-24 px-3 py-2 bg-[#121117] border border-[#2d281e] rounded-xl text-xs font-bold text-[#fef3c7]"
                 />
 
@@ -661,7 +664,7 @@ export const ProductManagementModal: React.FC<ProductManagementModalProps> = ({
             {/* Lista de Artículos de la Composición */}
             {recipe.length === 0 ? (
               <div className="p-4 rounded-xl bg-[#121117] border border-dashed border-[#2d281e] text-center text-[#78716c] text-xs">
-                No has agregado ningún artículo a la composición de este producto comercial.
+                Sin artículos de inventario asignados (opcional). Este producto no descontará insumos de forma automática al facturarse.
               </div>
             ) : (
               <div className="space-y-2">
@@ -736,33 +739,43 @@ export const ProductManagementModal: React.FC<ProductManagementModalProps> = ({
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-[#d4af37] uppercase tracking-wider flex items-center gap-1.5">
                 <ImageIcon className="w-3.5 h-3.5" />
-                <span>3. Fotografías Comerciales (Hasta 3)</span>
+                <span>3. Fotografías Comerciales (Opcional, hasta 3)</span>
               </h3>
               <span className="text-[10px] text-[#a8a29e]">
                 {images.length}/3 fotos
               </span>
             </div>
 
-            <div className="grid grid-cols-3 gap-3">
-              {images.map((url, idx) => (
-                <div
-                  key={idx}
-                  className="relative group rounded-xl overflow-hidden h-24 bg-[#121117] border border-[#2d281e]"
-                >
-                  <img src={url} alt="" className="w-full h-full object-cover" />
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveImage(idx)}
-                    className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-900/90 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+            {images.length === 0 ? (
+              <div className="p-4 rounded-xl bg-[#121117] border border-dashed border-[#2d281e] text-center text-xs flex flex-col items-center justify-center gap-1.5 text-[#a8a29e]">
+                <ImageIcon className="w-6 h-6 opacity-40 text-[#d4af37]" />
+                <span className="font-semibold text-[#fef3c7]">No hay fotografías cargadas por defecto</span>
+                <span className="text-[11px] text-[#78716c]">
+                  Si deseas agregar una foto comercial, ingresa la URL a continuación. De lo contrario, se usará el icono predeterminado.
+                </span>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-3">
+                {images.map((url, idx) => (
+                  <div
+                    key={idx}
+                    className="relative group rounded-xl overflow-hidden h-24 bg-[#121117] border border-[#2d281e]"
                   >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
-                  <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/70 text-[9px] text-white">
-                    Foto {idx + 1}
-                  </span>
-                </div>
-              ))}
-            </div>
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveImage(idx)}
+                      className="absolute top-1 right-1 w-6 h-6 rounded-full bg-red-900/90 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                    <span className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded bg-black/70 text-[9px] text-white">
+                      Foto {idx + 1}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {images.length < 3 && (
               <div className="flex items-center gap-2 pt-1">

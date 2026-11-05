@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   CheckCircle2,
   Image as ImageIcon,
+  UtensilsCrossed,
 } from 'lucide-react';
 
 interface ProductCardProps {
@@ -42,9 +43,8 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const [imageError, setImageError] = useState<boolean>(false);
 
   const prepStation = prepStations.find((s) => s.id === product.prepStationId);
-  const images = product.images && product.images.length > 0
-    ? product.images
-    : ['https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80'];
+  const hasCustomImages = Boolean(product.images && product.images.length > 0);
+  const images = hasCustomImages ? product.images! : [];
 
   const hasVariants = product.variants && product.variants.length > 0;
   const isAgotado = product.status === 'agotado';
@@ -62,7 +62,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
     >
       {/* Visual Image Header (reducido 50%) */}
       <div className="relative w-full h-22 bg-[#141414] overflow-hidden select-none">
-        {!imageError ? (
+        {hasCustomImages && !imageError ? (
           <img
             src={images[activeImageIndex] || images[0]}
             alt={product.name}
@@ -72,19 +72,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           />
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center bg-[#151515] text-[#777]">
-            <ImageIcon className="w-10 h-10 mb-1 opacity-50" />
-            <span className="text-xs">Foto no disponible</span>
+            <UtensilsCrossed className="w-7 h-7 mb-1 opacity-40 text-[#D6A21A]" />
+            <span className="text-[10px] font-medium text-zinc-400">Sin fotografía</span>
           </div>
         )}
 
         {/* Gradient Overlay */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#1e1e1e] via-transparent to-black/50" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#1e1e1e] via-transparent to-black/30 pointer-events-none" />
 
         {/* Top Badges */}
         <div className="absolute top-2.5 left-2.5 right-2.5 flex items-center justify-between pointer-events-none">
           <div className="flex flex-wrap items-center gap-1.5 pointer-events-auto">
             {/* SKU Badge */}
-            <span className="px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-[10px] font-mono font-bold text-[#D6A21A] border border-[#B77900]/40">
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-black tracking-wide border shadow-sm transition-all sku-badge bg-[#292212] text-[#D6A21A] border-[#B77900]/60">
               {product.sku || 'SIN-SKU'}
             </span>
 
@@ -147,7 +147,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         )}
 
         {/* Estimated Prep Time */}
-        <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-black/75 backdrop-blur-sm px-2 py-0.5 rounded-md text-[10px] text-zinc-300">
+        <div className="absolute bottom-2 left-2 flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold border shadow-sm prep-time-badge bg-[#181818]/90 text-[#e7e5e4] border-[#383838]">
           <Clock className="w-3 h-3 text-[#D6A21A]" />
           <span>{product.prepTimeMinutes || 15} min</span>
         </div>

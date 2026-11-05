@@ -2511,12 +2511,12 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       const id = newRef.id;
       const now = new Date().toISOString();
 
-      const newProduct: Product = {
+      const newProduct: Product = sanitizeFirestoreData({
         ...data,
         id,
         createdAt: now,
         updatedAt: now,
-      };
+      });
 
       await setDoc(newRef, newProduct);
 
@@ -2531,7 +2531,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
       await setDoc(
         doc(db, 'menuItems', id),
-        {
+        sanitizeFirestoreData({
           id,
           name: newProduct.name,
           description: newProduct.description,
@@ -2548,7 +2548,7 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
           variants: newProduct.variants || [],
           isCombo: Boolean(newProduct.isCombo),
           comboConfig: newProduct.comboConfig || null,
-        },
+        }),
         { merge: true }
       );
 
@@ -2574,10 +2574,10 @@ export const RestaurantProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     try {
       setActionLoading(true);
       const now = new Date().toISOString();
-      await updateDoc(doc(db, 'products', id), {
+      await updateDoc(doc(db, 'products', id), sanitizeFirestoreData({
         ...data,
         updatedAt: now,
-      });
+      }));
 
       // Sincronizar con menuItems
       const menuItemUpdate: Record<string, any> = {};

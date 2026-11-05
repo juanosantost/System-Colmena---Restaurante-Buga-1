@@ -37,7 +37,10 @@ import {
   PinOff,
   PanelLeft,
   BookOpen,
+  Sun,
+  Moon,
 } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 
 export type AppView =
   | 'home'
@@ -91,6 +94,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
   } = useAuth();
   const { tables, activeOrders, activeComandas, inventory, activeShift } = useRestaurant();
   const { showToast } = useToast();
+  const { isLight, toggleTheme } = useTheme();
 
   // Estado para la navbar: oculta para aprovechar el 100% de la pantalla en escritorio y móvil
   const [isNavOpen, setIsNavOpen] = useState<boolean>(false);
@@ -343,8 +347,26 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
               </div>
             </div>
 
-            {/* Lado Derecho: Botón Manual y Cerrar Sesión */}
+            {/* Lado Derecho: Botón Tema Claro/Oscuro, Manual y Cerrar Sesión */}
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className={`px-3 py-1.5 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer ${
+                  isLight
+                    ? 'bg-amber-100 hover:bg-amber-200 border-amber-300 text-amber-950 shadow-sm'
+                    : 'bg-[#242424] hover:bg-[#2e2e2e] border-[#383838] text-[#e7e5e4] hover:border-[#d4af37]/60'
+                }`}
+                title={isLight ? 'Cambiar a Modo Oscuro' : 'Cambiar a Modo Claro'}
+              >
+                {isLight ? (
+                  <Moon className="w-3.5 h-3.5 text-amber-800" />
+                ) : (
+                  <Sun className="w-3.5 h-3.5 text-[#D6A21A]" />
+                )}
+                <span className="hidden sm:inline">{isLight ? 'Modo Oscuro' : 'Modo Claro'}</span>
+              </button>
+
               <button
                 type="button"
                 onClick={() => onNavigate('manual')}
@@ -372,14 +394,29 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
 
           </div>
 
-          {/* Barra móvil para sede y hora oficial */}
+          {/* Barra móvil para sede, tema y hora oficial */}
           <div className="md:hidden py-2 border-t border-[#2e2e2e] flex items-center justify-between text-xs">
             <div className="flex items-center gap-1.5 text-[#a8a29e]">
               <MapPin className="w-3.5 h-3.5 text-[#D6A21A]" />
               <span className="text-xs font-bold text-[#FFFDF5]">Guadalajara de Buga</span>
             </div>
-            <div className="text-[11px] text-[#D6A21A] font-mono font-semibold">
-              {colombiaTime} (Buga)
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className={`px-2 py-1 rounded-lg border text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                  isLight
+                    ? 'bg-amber-100 border-amber-300 text-amber-950'
+                    : 'bg-[#242424] border-[#383838] text-[#D6A21A]'
+                }`}
+                title={isLight ? 'Modo Oscuro' : 'Modo Claro'}
+              >
+                {isLight ? <Moon className="w-3.5 h-3.5 text-amber-800" /> : <Sun className="w-3.5 h-3.5 text-[#D6A21A]" />}
+                <span className="text-[10px] font-semibold">{isLight ? 'Oscuro' : 'Claro'}</span>
+              </button>
+              <div className="text-[11px] text-[#D6A21A] font-mono font-semibold">
+                {colombiaTime} (Buga)
+              </div>
             </div>
           </div>
 
@@ -439,6 +476,27 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                   })}
                 </div>
               ))}
+            </div>
+
+            {/* Pie de barra fijada con botón de tema */}
+            <div className="p-3 border-t border-[#2e2e2e] shrink-0">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className={`w-full flex items-center justify-center gap-2 p-2 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
+                  isLight
+                    ? 'bg-amber-100 hover:bg-amber-200 text-amber-950 border-amber-300 shadow-sm'
+                    : 'bg-[#242424] hover:bg-[#2e2e2e] text-[#d6d3d1] border-[#383838] hover:border-[#d4af37]/60'
+                }`}
+                title={isLight ? 'Cambiar a Modo Oscuro' : 'Cambiar a Modo Claro'}
+              >
+                {isLight ? (
+                  <Moon className="w-3.5 h-3.5 text-amber-800" />
+                ) : (
+                  <Sun className="w-3.5 h-3.5 text-[#D6A21A]" />
+                )}
+                <span>{isLight ? 'Modo Oscuro' : 'Modo Claro'}</span>
+              </button>
             </div>
           </aside>
         )}
@@ -541,8 +599,26 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
                 ))}
               </div>
 
-              {/* Manual y Cerrar Sesión en pie del drawer */}
+              {/* Tema, Manual y Cerrar Sesión en pie del drawer */}
               <div className="pt-3 border-t border-[#2e2e2e] mt-3 space-y-2">
+                <button
+                  type="button"
+                  onClick={toggleTheme}
+                  className={`w-full flex items-center justify-center gap-2 p-2.5 rounded-xl border text-xs font-bold cursor-pointer transition-colors ${
+                    isLight
+                      ? 'bg-amber-100 hover:bg-amber-200 text-amber-950 border-amber-300 shadow-sm'
+                      : 'bg-[#242424] hover:bg-[#2e2e2e] text-[#d6d3d1] border-[#383838] hover:border-[#d4af37]/60'
+                  }`}
+                  title={isLight ? 'Cambiar a Modo Oscuro' : 'Cambiar a Modo Claro'}
+                >
+                  {isLight ? (
+                    <Moon className="w-4 h-4 text-amber-800" />
+                  ) : (
+                    <Sun className="w-4 h-4 text-[#D6A21A]" />
+                  )}
+                  <span>{isLight ? 'Cambiar a Modo Oscuro' : 'Cambiar a Modo Claro'}</span>
+                </button>
+
                 <button
                   type="button"
                   onClick={() => {

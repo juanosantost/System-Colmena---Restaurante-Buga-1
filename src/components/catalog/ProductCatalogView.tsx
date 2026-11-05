@@ -102,7 +102,7 @@ export const ProductCatalogView: React.FC = () => {
   return (
     <div className="space-y-6">
       {/* 1. Header Hero & Navigation Bar */}
-      <div className="rounded-3xl bg-gradient-to-r from-[#1b1b1b] via-[#1f1b14] to-[#171717] border border-[#B77900]/30 p-6 shadow-xl">
+      <div className="rounded-3xl bg-[#181818] border border-[#B77900]/30 p-6 shadow-xl relative overflow-hidden">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl bg-[#292212] border border-[#B77900]/60 text-[#D6A21A] flex items-center justify-center shadow-lg">
@@ -157,8 +157,8 @@ export const ProductCatalogView: React.FC = () => {
         </div>
 
         {/* 2. Overview Stats Badges */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-[#2d2922]">
-          <div className="p-3 rounded-2xl bg-[#141414]/90 border border-[#2a2a2a] flex items-center gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-4 border-t border-[#383838]">
+          <div className="p-3 rounded-2xl bg-[#242424] border border-[#383838] flex items-center gap-3">
             <span className="w-9 h-9 rounded-xl bg-[#292212] border border-[#B77900]/40 text-[#D6A21A] flex items-center justify-center font-bold">
               <Tag className="w-4 h-4" />
             </span>
@@ -168,7 +168,7 @@ export const ProductCatalogView: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-3 rounded-2xl bg-[#141414]/90 border border-[#2a2a2a] flex items-center gap-3">
+          <div className="p-3 rounded-2xl bg-[#242424] border border-[#383838] flex items-center gap-3">
             <span className="w-9 h-9 rounded-xl bg-emerald-950/80 border border-emerald-700/40 text-emerald-300 flex items-center justify-center font-bold">
               <CheckCircle2 className="w-4 h-4" />
             </span>
@@ -178,7 +178,7 @@ export const ProductCatalogView: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-3 rounded-2xl bg-[#141414]/90 border border-[#2a2a2a] flex items-center gap-3">
+          <div className="p-3 rounded-2xl bg-[#242424] border border-[#383838] flex items-center gap-3">
             <span className="w-9 h-9 rounded-xl bg-amber-950/80 border border-amber-600/40 text-[#D6A21A] flex items-center justify-center font-bold">
               <Boxes className="w-4 h-4" />
             </span>
@@ -188,7 +188,7 @@ export const ProductCatalogView: React.FC = () => {
             </div>
           </div>
 
-          <div className="p-3 rounded-2xl bg-[#141414]/90 border border-[#2a2a2a] flex items-center gap-3">
+          <div className="p-3 rounded-2xl bg-[#242424] border border-[#383838] flex items-center gap-3">
             <span className="w-9 h-9 rounded-xl bg-rose-950/80 border border-rose-700/40 text-rose-300 flex items-center justify-center font-bold">
               <Flame className="w-4 h-4" />
             </span>
@@ -317,7 +317,7 @@ export const ProductCatalogView: React.FC = () => {
           </button>
 
           {/* View mode toggle */}
-          <div className="flex items-center bg-[#131313] p-1 rounded-xl border border-[#2d2d2d]">
+          <div className="flex items-center bg-[#242424] p-1 rounded-xl border border-[#383838]">
             <button
               type="button"
               onClick={() => setViewMode('grid')}
@@ -348,7 +348,7 @@ export const ProductCatalogView: React.FC = () => {
 
       {/* 5. Main Catalog Content (Grid or Table) */}
       {filteredProducts.length === 0 ? (
-        <div className="p-12 text-center rounded-3xl bg-[#191919] border border-[#2b2b2b] text-zinc-400 space-y-3">
+        <div className="p-12 text-center rounded-3xl bg-[#181818] border border-[#383838] text-zinc-400 space-y-3">
           <UtensilsCrossed className="w-12 h-12 mx-auto text-zinc-600" />
           <h3 className="text-base font-bold text-white">No se encontraron productos</h3>
           <p className="text-xs text-zinc-500 max-w-md mx-auto">
@@ -416,14 +416,17 @@ export const ProductCatalogView: React.FC = () => {
                     >
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-3">
-                          <img
-                            src={
-                              p.images?.[0] ||
-                              'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=200&q=80'
-                            }
-                            alt=""
-                            className="w-10 h-10 rounded-xl object-cover border border-zinc-700 flex-shrink-0"
-                          />
+                          {p.images && p.images.length > 0 ? (
+                            <img
+                              src={p.images[0]}
+                              alt=""
+                              className="w-10 h-10 rounded-xl object-cover border border-zinc-700 flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-xl bg-[#1a1924] border border-zinc-700 flex items-center justify-center flex-shrink-0 text-zinc-400">
+                              <UtensilsCrossed className="w-4 h-4 text-[#D6A21A]/70" />
+                            </div>
+                          )}
                           <div>
                             <div className="font-bold text-[#FFFDF5] group-hover:text-[#D6A21A] transition-colors">
                               {p.name}
@@ -434,8 +437,10 @@ export const ProductCatalogView: React.FC = () => {
                           </div>
                         </div>
                       </td>
-                      <td className="py-3 px-4 font-mono text-[11px] text-[#D6A21A]">
-                        {p.sku}
+                      <td className="py-3 px-4">
+                        <span className="sku-badge inline-block px-2 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wide border shadow-xs bg-[#292212] text-[#D6A21A] border-[#B77900]/60">
+                          {p.sku || 'SIN-SKU'}
+                        </span>
                       </td>
                       <td className="py-3 px-4 font-medium text-zinc-300">
                         {p.categoryName || 'Gastronomía'}
@@ -557,7 +562,13 @@ export const ProductCatalogView: React.FC = () => {
 
             <div className="p-3.5 rounded-xl bg-[#141414] border border-[#2b2b2b] text-xs space-y-1">
               <div className="font-bold text-[#D6A21A] text-sm">{productToDelete.name}</div>
-              <div className="text-zinc-400 font-mono text-[11px]">SKU: {productToDelete.sku} · Precio: {formatProductPrice(productToDelete.price)}</div>
+              <div className="text-zinc-400 font-mono text-[11px] flex items-center gap-1.5 flex-wrap">
+                <span>SKU:</span>
+                <span className="sku-badge px-1.5 py-0.5 rounded font-mono font-bold text-[#D6A21A] bg-[#292212] border border-[#B77900]/60">
+                  {productToDelete.sku}
+                </span>
+                <span>· Precio: {formatProductPrice(productToDelete.price)}</span>
+              </div>
               {productToDelete.description && (
                 <div className="text-zinc-500 text-[11px] line-clamp-2">{productToDelete.description}</div>
               )}

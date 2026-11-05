@@ -7,7 +7,10 @@ import {
   Building2,
   LogIn,
   User,
+  Sun,
+  Moon,
 } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 
 export const LoginView: React.FC = () => {
   const {
@@ -17,6 +20,7 @@ export const LoginView: React.FC = () => {
     branches,
   } = useAuth();
   const { showToast } = useToast();
+  const { isLight, toggleTheme } = useTheme();
 
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [showBootstrapModal, setShowBootstrapModal] = useState<boolean>(false);
@@ -84,8 +88,28 @@ export const LoginView: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0e0e10] text-[#FFFDF5] flex flex-col justify-center items-center p-4 sm:p-8">
-      
+    <div className="min-h-screen bg-[#0e0e10] text-[#FFFDF5] flex flex-col justify-center items-center p-4 sm:p-8 relative">
+      {/* Botón flotante superior para alternar modo claro / oscuro */}
+      <div className="fixed top-4 right-4 z-50">
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className={`px-3 py-2 rounded-2xl border text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-lg ${
+            isLight
+              ? 'bg-amber-100 hover:bg-amber-200 border-amber-300 text-amber-950 shadow-amber-900/10'
+              : 'bg-[#181818] hover:bg-[#242424] border-[#383838] text-[#e7e5e4] hover:border-[#d4af37]/60'
+          }`}
+          title={isLight ? 'Cambiar a Modo Oscuro' : 'Cambiar a Modo Claro'}
+        >
+          {isLight ? (
+            <Moon className="w-4 h-4 text-amber-800" />
+          ) : (
+            <Sun className="w-4 h-4 text-[#D6A21A]" />
+          )}
+          <span>{isLight ? 'Modo Oscuro' : 'Modo Claro'}</span>
+        </button>
+      </div>
+
       {/* Tarjeta Central de Inicio de Sesión */}
       <div className="w-full max-w-xl bg-[#181818] text-[#FFFDF5] rounded-3xl p-6 sm:p-10 border border-[#B77900]/40 shadow-2xl relative overflow-hidden">
         

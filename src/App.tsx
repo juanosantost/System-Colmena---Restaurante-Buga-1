@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { RestaurantProvider } from './context/RestaurantContext';
@@ -186,14 +187,16 @@ const MainAppContent: React.FC = () => {
 
 export default function App() {
   return (
-    <ToastProvider>
-      <AuthProvider>
-        <RestaurantProvider>
-          <MenuConfigProvider>
-            <MainAppContent />
-          </MenuConfigProvider>
-        </RestaurantProvider>
-      </AuthProvider>
-    </ToastProvider>
+    <ThemeProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <RestaurantProvider>
+            <MenuConfigProvider>
+              <MainAppContent />
+            </MenuConfigProvider>
+          </RestaurantProvider>
+        </AuthProvider>
+      </ToastProvider>
+    </ThemeProvider>
   );
 }

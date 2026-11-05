@@ -177,7 +177,7 @@ export const ManualView: React.FC = () => {
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16">
       {/* HEADER PRINCIPAL */}
-      <div className="bg-gradient-to-r from-[#16151e] via-[#1a1924] to-[#14131a] p-6 rounded-3xl border border-[#2d281e] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-[#181818] p-6 rounded-3xl border border-[#2d281e] shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative overflow-hidden">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#d4af37] to-[#8c6d1d] flex items-center justify-center text-[#0e0e12] font-black text-2xl shadow-lg shadow-[#d4af37]/20 shrink-0">
             <BookOpen className="w-7 h-7" />
